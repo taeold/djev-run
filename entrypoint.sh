@@ -4,7 +4,7 @@ set -euo pipefail
 MODEL="${MODEL:-/mnt/gcs/dgemma}"
 CANVAS="${CANVAS:-128}"
 PORT="${PORT:-8080}"
-ENFORCE_EAGER="${ENFORCE_EAGER:-0}"
+ENFORCE_EAGER="${ENFORCE_EAGER:-1}"
 JIT_CACHE_ARCHIVE="/mnt/gcs/jit-cache/rtx-pro-6000-cache.tar.gz"
 
 mkdir -p /root/.cache/flashinfer /root/.triton /root/.cache/vllm

@@ -101,7 +101,14 @@ gcloud beta run deploy djev-dgemma \
   --add-volume=name=weights,type=cloud-storage,bucket="${BUCKET}",readonly=false,mount-options=enable-buffered-read=true \
   --add-volume-mount=volume=weights,mount-path=/mnt/gcs \
   --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=15,periodSeconds=10,timeoutSeconds=5,failureThreshold=90 \
-  --set-env-vars="MODEL=/mnt/gcs/dgemma,CANVAS=128,MAX_SEQS=32,MAX_MODEL_LEN=4096,GPU_UTIL=0.40,KV_CACHE_GB=2,ATTN=TRITON_ATTN,COPY_TO_SHM=1,VLLM_UF_EAGER_ALL=1,VLLM_FLASHINFER_MOE_BACKEND=masked_gemm,VLLM_WORKER_MULTIPROC_METHOD=spawn,CUDA_MODULE_LOADING=LAZY"
+  --set-env-vars="MODEL=/mnt/gcs/dgemma,CANVAS=128,MAX_SEQS=32,MAX_MODEL_LEN=4096,GPU_UTIL=0.40,KV_CACHE_GB=2,ATTN=TRITON_ATTN,COPY_TO_SHM=1,ENFORCE_EAGER=1,VLLM_UF_EAGER_ALL=1,VLLM_FLASHINFER_MOE_BACKEND=masked_gemm,VLLM_WORKER_MULTIPROC_METHOD=spawn,CUDA_MODULE_LOADING=LAZY"
+
+# --no-gpu-zonal-redundancy: required for standard regional RTX PRO 6000 quota
+# --no-cpu-throttling: keeps all 20 vCPUs active during weight loading and vLLM scheduling
+# --network=default --subnet=default --vpc-egress=all-traffic: streams weights from GCS over Google internal networking (~1 GB/s)
+# mount-options=enable-buffered-read=true: prefetches 18 GB safetensors shards sequentially from GCS
+# COPY_TO_SHM=1: copies the 18 GB model into /dev/shm RAM in 19s so safetensors mmap loads from RAM
+# ENFORCE_EAGER=1: passes --enforce-eager to vllm serve to skip torch.compile and 35-batch CUDA graph capture (cuts cold start from ~4 min to ~45s)
 ```
 
 `ghcr.io/taeold/djev-run:latest` is built from the `Dockerfile` in this repo
@@ -112,14 +119,14 @@ gcloud beta run deploy djev-dgemma \
 
 ## Performance
 
--   **Single-step evaluation (`steps=1`)**: ~30-45 ms on a warm container.
--   **Default cold start (~4 minutes)**: vLLM spends ~220 seconds in
-    `torch.compile` and capturing 35 CUDA graphs across batch sizes before
-    opening port 8080.
--   **Fast cold start (`ENFORCE_EAGER=1`)**: Adding `ENFORCE_EAGER=1` to
-    `--set-env-vars` passes `--enforce-eager` to `vllm serve`, skipping
-    `torch.compile` and CUDA graph capture. This cuts cold start to **~45
-    seconds** while only adding ~3-5 ms to single-step latency.
+-   **Cold start (`~45 seconds` with `ENFORCE_EAGER=1`)**: Standard LLM
+    deployments spend ~180s at startup running `torch.compile` and recording 35
+    CUDA graphs across batch sizes to save ~2 ms per token across 500 generated
+    tokens. Because `djev` evaluates all questions in a single forward pass
+    (`steps=1`), `ENFORCE_EAGER=1` skips `torch.compile` and CUDA graph capture,
+    cutting cold start from ~4 minutes to **~45 seconds** while adding only ~3-5
+    ms per request.
+-   **Warm single-step evaluation (`steps=1`)**: ~30-45 ms per request.
 
 --------------------------------------------------------------------------------
 
