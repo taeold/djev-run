@@ -417,7 +417,7 @@ const VEC = {
 const QUESTIONS_SCHEMA = {
   move: {
     type: "choice",
-    instructions: "Select the next move for the snake head. Choose a direction in safe_moves that reduces manhattan_to_food while preserving open_space.",
+    instructions: "Select the next move for the snake head. Choose recommended_safe_move in safe_moves that reduces manhattan_to_food while preserving open_space.",
     criteria: {
       up: "Move north (y - 1)",
       down: "Move south (y + 1)",
