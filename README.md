@@ -102,7 +102,7 @@ gcloud beta run deploy djev-dgemma \
   --add-volume=name=weights,type=cloud-storage,bucket="${BUCKET}",readonly=false,mount-options=enable-buffered-read=true \
   --add-volume-mount=volume=weights,mount-path=/mnt/gcs \
   --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=15,periodSeconds=10,timeoutSeconds=5,failureThreshold=90 \
-  --set-env-vars="MODEL=/mnt/gcs/dgemma,CANVAS=128,MAX_SEQS=32,MAX_MODEL_LEN=4096,GPU_UTIL=0.40,KV_CACHE_GB=2,ATTN=TRITON_ATTN,COPY_TO_SHM=1,DISABLE_MM=1,VLLM_UF_EAGER_ALL=1,VLLM_FLASHINFER_MOE_BACKEND=masked_gemm,VLLM_WORKER_MULTIPROC_METHOD=spawn,CUDA_MODULE_LOADING=LAZY"
+  --set-env-vars="MODEL=/mnt/gcs/dgemma,CANVAS=128,MAX_SEQS=32,MAX_MODEL_LEN=4096,GPU_UTIL=0.40,KV_CACHE_GB=2,ATTN=TRITON_ATTN,COPY_TO_SHM=1,ENFORCE_EAGER=1,DISABLE_MM=1,VLLM_UF_EAGER_ALL=1,VLLM_FLASHINFER_MOE_BACKEND=masked_gemm,VLLM_WORKER_MULTIPROC_METHOD=spawn,CUDA_MODULE_LOADING=LAZY"
 
 # --image=ghcr.io/taeold/djev-run:latest: prebuilt from github.com/mmastrac/djev-spark (upstream does not publish a registry image)
 # --no-gpu-zonal-redundancy: required for standard regional RTX PRO 6000 quota
@@ -110,8 +110,8 @@ gcloud beta run deploy djev-dgemma \
 # --network=default --subnet=default --vpc-egress=all-traffic: streams weights from GCS over Google internal networking (~1.05 GiB/s)
 # mount-options=enable-buffered-read=true: prefetches 18 GB safetensors shards sequentially from GCS
 # COPY_TO_SHM=1: copies the 17.53 GiB model into /dev/shm RAM in 16.6s so safetensors mmap loads in 5.8s
-# DISABLE_MM=1: passes --language-model-only --skip-mm-profiling to skip 51s of SigLIP vision/video encoder profiling
-# ENFORCE_EAGER=1 (optional): add to --set-env-vars to cut cold start to 2m 39s (64 ms c=1 latency, 6.5 RPS at c=32)
+# ENFORCE_EAGER=1: passes --enforce-eager to vllm serve to skip torch.compile and 35-batch CUDA graph capture (saves 52s on cold start)
+# DISABLE_MM=1: passes --language-model-only --skip-mm-profiling to skip 51s of SigLIP vision/video encoder profiling (saves another 30s on cold start)
 ```
 
 ### Run the Sample Code
@@ -128,32 +128,28 @@ paste your Cloud Run URL to run the live 1-step diffusion Snake demo.
 
 ## Performance
 
--   **Warm throughput & latency (`DISABLE_MM=1`, CUDA graphs enabled)**:
-    -   **Single-step evaluation (`c=1, steps=1, samples=1`)**: **30-35 ms**
-        server inference (`~150 ms` end-to-end HTTPS).
-    -   **Concurrent batch (`c=32, steps=1, samples=1`)**: **123 RPS**
-        (`MAX_SEQS=32`).
--   **Fast-boot mode (`DISABLE_MM=1,ENFORCE_EAGER=1`, skipping `torch.compile` &
-    CUDA graphs)**:
-    -   **Single-step evaluation (`c=1, steps=1, samples=1`)**: **64.0 ms** mean
-        (`60.9-68.9 ms`; **163.4 ms** for `samples="auto"` with 4 parallel
-        samples).
-    -   **Concurrent batch (`c=32, steps=1, samples=1`)**: **6.5 RPS** (skipping
-        CUDA graph capture trades off batch throughput for faster container
-        startup).
--   **Cold start breakdown (`4m 05s` baseline -> `3m 14s` with `DISABLE_MM=1` ->
-    `2m 39s` with `DISABLE_MM=1,ENFORCE_EAGER=1`)**:
+-   **Warm single-step evaluation (`c=1, steps=1, samples=1`)**: **60-64 ms**
+    server inference (`119 ms` end-to-end HTTPS; **163 ms** for `samples="auto"`
+    with 4 parallel samples).
+-   **Concurrent batch (`c=32, steps=1, samples=1`)**: **94-123 RPS** (`0.68s`
+    for 64 requests across 32 workers; **157-171 ms** per 32-request batch after
+    one-time Triton kernel JIT).
+-   **Cold start (`2m 39s` (`159s`) vs. `4m 05s` (`245s`) baseline)**:
     -   **GCS to `/dev/shm` stage (`COPY_TO_SHM=1`)**: `16.6s` for 17.53 GiB
         (`1.05 GiB/s`), saturating Cloud Run's ~10 Gbps container network link,
         followed by `5.82s` `safetensors` weight loading from RAM.
-    -   **`DISABLE_MM=1` (saves `51s` of multimodal profiling)**: DiffusionGemma
-        includes a SigLIP vision/video tower that vLLM warms up with 3 dummy
+    -   **`ENFORCE_EAGER=1` (saves `52s`, `220s` -> `168s`)**: Standard LLM
+        deployments run `torch.compile` and record 35 CUDA graphs across batch
+        sizes to save ~2 ms per token across 500 generated tokens. Because
+        `djev` evaluates all questions in a single forward pass (`steps=1`),
+        `ENFORCE_EAGER=1` skips `torch.compile` and CUDA graph capture while
+        matching full `c=32` batch throughput (`157 ms` vs `171 ms` per
+        32-request batch).
+    -   **`DISABLE_MM=1` (saves `30s`, `168s` -> `138s`)**: DiffusionGemma
+        includes a SigLIP vision/video tower that vLLM profiles with 3 dummy
         video items at startup (`51.02s`). Passing `--language-model-only
         --skip-mm-profiling` runs the model in text-only mode and cuts `init
         engine` from `73.1s` to `49.1s`.
-    -   **`ENFORCE_EAGER=1` (saves an additional `30-52s`)**: Skips
-        `torch.compile` and 35-batch CUDA graph capture (`vllm serve` starts in
-        `138s` total instead of `220s`).
 
 --------------------------------------------------------------------------------
 
