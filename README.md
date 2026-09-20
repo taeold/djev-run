@@ -107,8 +107,8 @@ gcloud beta run deploy djev-dgemma \
 # --no-cpu-throttling: keeps all 20 vCPUs active during weight loading and vLLM scheduling
 # --network=default --subnet=default --vpc-egress=all-traffic: streams weights from GCS over Google internal networking (~1 GB/s)
 # mount-options=enable-buffered-read=true: prefetches 18 GB safetensors shards sequentially from GCS
-# COPY_TO_SHM=1: copies the 18 GB model into /dev/shm RAM in 19s so safetensors mmap loads from RAM
-# ENFORCE_EAGER=1: passes --enforce-eager to vllm serve to skip torch.compile and 35-batch CUDA graph capture (cuts cold start from ~4 min to ~45s)
+# COPY_TO_SHM=1: copies the 18 GB model into /dev/shm RAM in 19.7s so safetensors mmap loads in 5.97s
+# ENFORCE_EAGER=1: passes --enforce-eager to vllm serve to skip torch.compile and 35-batch CUDA graph capture (saves 52s on cold start)
 ```
 
 `ghcr.io/taeold/djev-run:latest` is built from the `Dockerfile` in this repo
@@ -119,14 +119,20 @@ gcloud beta run deploy djev-dgemma \
 
 ## Performance
 
--   **Cold start (`~45 seconds` with `ENFORCE_EAGER=1`)**: Standard LLM
-    deployments spend ~180s at startup running `torch.compile` and recording 35
-    CUDA graphs across batch sizes to save ~2 ms per token across 500 generated
-    tokens. Because `djev` evaluates all questions in a single forward pass
-    (`steps=1`), `ENFORCE_EAGER=1` skips `torch.compile` and CUDA graph capture,
-    cutting cold start from ~4 minutes to **~45 seconds** while adding only ~3-5
-    ms per request.
--   **Warm single-step evaluation (`steps=1`)**: ~30-45 ms per request.
+-   **Warm single-step evaluation (`steps=1`)**: **62-71 ms** (`65.9 ms` mean
+    for `samples=1`; **160-168 ms** for `samples="auto"` with 4 parallel
+    samples).
+-   **Cold start (`3m 12s` with `ENFORCE_EAGER=1` vs. `4m 05s` default)**:
+    -   **GCS to `/dev/shm` stage (`COPY_TO_SHM=1`)**: `19.7s` for 17.53 GiB
+        (`~910 MB/s`), followed by `5.97s` `safetensors` weight loading from
+        RAM.
+    -   **Why `ENFORCE_EAGER=1` is enabled by default**: Standard LLM
+        deployments run `torch.compile` and record 35 CUDA graphs across batch
+        sizes (`~52s`) to save ~2 ms per token across 500 generated tokens.
+        Because `djev` evaluates all questions in a single forward pass
+        (`steps=1`), `ENFORCE_EAGER=1` skips `torch.compile` and CUDA graph
+        capture (`vllm serve` ready in `168s` instead of `220s`) while adding
+        only ~3-5 ms per request.
 
 --------------------------------------------------------------------------------
 
