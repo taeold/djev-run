@@ -1,542 +1,702 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" class="dark">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>djev / snake</title>
-<script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
-<style>
-  :root {
-    --bg: var(--app-background, #ffffff);
-    --surface: var(--app-card, #f6f8fa);
-    --border: var(--app-border, #d0d7de);
-    --border-subtle: var(--app-card-border, #e6ebf1);
-    --text: var(--app-foreground, #1f2328);
-    --muted: var(--app-muted-foreground, #656d76);
-    --accent: var(--app-primary, #0969da);
-    --accent-dim: rgba(9, 105, 218, 0.12);
-    --ok: var(--success, #1a7f37);
-    --warn: var(--warning, #9a6700);
-    --danger: var(--danger, #cf222e);
-    --board-bg: #fafbfc;
-    --board-dot: #d8dee4;
-    --board-grid: #eff2f5;
-    --snake-head: #0969da;
-    --snake-body: #218bff;
-    --bar-idle: #afb8c1;
-    --track-bg: #eaeef2;
-    --font-ui: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif);
-    --font-mono: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not(.light) {
-      --bg: var(--app-background, #0d1117);
-      --surface: var(--app-card, #161b22);
-      --border: var(--app-border, #30363d);
-      --border-subtle: var(--app-card-border, #21262d);
-      --text: var(--app-foreground, #e6edf3);
-      --muted: var(--app-muted-foreground, #7d8590);
-      --accent: var(--app-primary, #2f81f7);
-      --accent-dim: rgba(47, 129, 247, 0.16);
-      --ok: var(--success, #3fb950);
-      --warn: var(--warning, #d29922);
-      --danger: var(--danger, #f85149);
-      --board-bg: #0d1117;
-      --board-dot: #30363d;
-      --board-grid: #161b22;
-      --snake-head: #2f81f7;
-      --snake-body: #1f6feb;
-      --bar-idle: #484f58;
-      --track-bg: #161b22;
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>djev // snake</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&display=swap');
+
+    :root {
+      --bg: #04060a;
+      --card-bg: #080c14;
+      --box-bg: #020408;
+      --border: #1e293b;
+      --border-inner: #141c2b;
+      --text: #cbd5e1;
+      --text-bright: #ffffff;
+      --muted: #64748b;
+      --cyan: #00e5ff;
+      --blue: #38bdf8;
+      --orange: #ff9800;
+      --green: #10b981;
+      --yellow: #facc15;
+      --red: #f43f5e;
+      --grid-line: #0b121e;
+      --grid-dot: #1e293b;
     }
-  }
-  html.dark {
-    --bg: var(--app-background, #0d1117);
-    --surface: var(--app-card, #161b22);
-    --border: var(--app-border, #30363d);
-    --border-subtle: var(--app-card-border, #21262d);
-    --text: var(--app-foreground, #e6edf3);
-    --muted: var(--app-muted-foreground, #7d8590);
-    --accent: var(--app-primary, #2f81f7);
-    --accent-dim: rgba(47, 129, 247, 0.16);
-    --ok: var(--success, #3fb950);
-    --warn: var(--warning, #d29922);
-    --danger: var(--danger, #f85149);
-    --board-bg: #0d1117;
-    --board-dot: #30363d;
-    --board-grid: #161b22;
-    --snake-head: #2f81f7;
-    --snake-body: #1f6feb;
-    --bar-idle: #484f58;
-    --track-bg: #161b22;
-  }
-  html.light {
-    --bg: var(--app-background, #ffffff);
-    --surface: var(--app-card, #f6f8fa);
-    --border: var(--app-border, #d0d7de);
-    --border-subtle: var(--app-card-border, #e6ebf1);
-    --text: var(--app-foreground, #1f2328);
-    --muted: var(--app-muted-foreground, #656d76);
-    --accent: var(--app-primary, #0969da);
-    --accent-dim: rgba(9, 105, 218, 0.12);
-    --ok: var(--success, #1a7f37);
-    --warn: var(--warning, #9a6700);
-    --danger: var(--danger, #cf222e);
-    --board-bg: #fafbfc;
-    --board-dot: #d8dee4;
-    --board-grid: #eff2f5;
-    --snake-head: #0969da;
-    --snake-body: #218bff;
-    --bar-idle: #afb8c1;
-    --track-bg: #eaeef2;
-  }
 
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    padding: 24px 32px 40px;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-ui);
-    font-size: 14px;
-    line-height: 1.5;
-    -webkit-font-smoothing: antialiased;
-  }
-  @media (max-width: 640px) {
-    body { padding: 16px; }
-  }
-
-  .shell {
-    max-width: 1000px;
-    margin: 0 auto;
-  }
-
-  .topbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--border-subtle);
-    margin-bottom: 24px;
-  }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .brand-title {
-    font-family: var(--font-mono);
-    font-size: 16px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    color: var(--text);
-  }
-  .brand-sep {
-    color: var(--muted);
-    font-weight: 400;
-  }
-  .status-line {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
-    min-width: 210px;
-  }
-  .dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--muted);
-    flex-shrink: 0;
-  }
-  .dot.live { background: var(--ok); }
-  .dot.warn { background: var(--warn); }
-  .dot.err { background: var(--danger); }
-
-  .toolbar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  button {
-    height: 32px;
-    padding: 0 12px;
-    font-family: var(--font-ui);
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background-color 150ms ease, border-color 150ms ease, opacity 150ms ease;
-  }
-  button:hover:not(:disabled) {
-    background: var(--surface);
-  }
-  button.primary {
-    background: var(--accent);
-    color: #ffffff;
-    border-color: var(--accent);
-  }
-  button.primary:hover:not(:disabled) {
-    opacity: 0.9;
-  }
-  button.ghost {
-    border-color: transparent;
-    color: var(--muted);
-    font-weight: 400;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    padding: 0 8px;
-  }
-  button.ghost:hover {
-    color: var(--text);
-    background: var(--surface);
-  }
-  button:focus-visible, input:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-
-  .config-drawer {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-    padding: 0 0 18px;
-    margin-bottom: 22px;
-    border-bottom: 1px solid var(--border-subtle);
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .config-drawer[hidden] {
-    display: none !important;
-  }
-  .config-drawer label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .config-drawer input[type="text"],
-  .config-drawer input[type="password"] {
-    height: 30px;
-    padding: 0 10px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--text);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-  }
-
-  .workspace {
-    display: grid;
-    grid-template-columns: 400px 1fr;
-    gap: 44px;
-    align-items: start;
-  }
-  @media (max-width: 860px) {
-    .workspace {
-      grid-template-columns: 1fr;
-      gap: 28px;
+    html.light {
+      --bg: #f1f5f9;
+      --card-bg: #ffffff;
+      --box-bg: #f8fafc;
+      --border: #cbd5e1;
+      --border-inner: #e2e8f0;
+      --text: #1e293b;
+      --text-bright: #0f172a;
+      --muted: #64748b;
+      --cyan: #0284c7;
+      --blue: #0369a1;
+      --orange: #d97706;
+      --green: #059669;
+      --yellow: #ca8a04;
+      --red: #e11d48;
+      --grid-line: #e2e8f0;
+      --grid-dot: #cbd5e1;
     }
-  }
 
-  .board-wrap {
-    width: 100%;
-    max-width: 400px;
-  }
-  canvas#board {
-    display: block;
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--board-bg);
-  }
-  .board-caption {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 10px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
-  }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
 
-  .readout {
-    min-width: 0;
-  }
-  .metrics-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 24px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid var(--border-subtle);
-    margin-bottom: 22px;
-  }
-  .metric-label {
-    font-size: 12px;
-    color: var(--muted);
-    margin-bottom: 4px;
-  }
-  .metric-value {
-    font-family: var(--font-mono);
-    font-size: 26px;
-    font-weight: 600;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-  }
-  .metric-unit {
-    font-size: 13px;
-    font-weight: 400;
-    color: var(--muted);
-    margin-left: 3px;
-  }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 13px;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      overflow-x: hidden;
+      position: relative;
+    }
 
-  .section-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 8px;
-  }
-  .section-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
-  }
-  .mask-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--muted);
-    cursor: pointer;
-    user-select: none;
-  }
-  .mask-toggle input {
-    margin: 0;
-    accent-color: var(--accent);
-  }
+    html.dark body::before {
+      content: " ";
+      display: block;
+      position: fixed;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.28) 50%);
+      background-size: 100% 4px;
+      z-index: 100;
+      pointer-events: none;
+      opacity: 0.3;
+    }
 
-  .prob-table {
-    border-top: 1px solid var(--border-subtle);
-    margin-bottom: 24px;
-  }
-  .prob-row {
-    display: grid;
-    grid-template-columns: 72px 1fr 68px 54px;
-    align-items: center;
-    gap: 14px;
-    height: 40px;
-    border-bottom: 1px solid var(--border-subtle);
-    font-family: var(--font-mono);
-    font-size: 13px;
-    font-variant-numeric: tabular-nums;
-  }
-  .dir-cell {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--muted);
-    font-weight: 400;
-  }
-  .dir-cell.active {
-    color: var(--accent);
-    font-weight: 600;
-  }
-  .dir-arrow {
-    display: inline-block;
-    width: 14px;
-    text-align: center;
-  }
-  .meter-track {
-    height: 6px;
-    background: var(--track-bg);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-  .meter-fill {
-    height: 100%;
-    width: 0%;
-    background: var(--bar-idle);
-    border-radius: 3px;
-    transition: width 100ms ease, background-color 100ms ease;
-  }
-  .meter-fill.active {
-    background: var(--accent);
-  }
-  .meter-fill.danger {
-    background: var(--danger);
-  }
-  .pct-cell {
-    text-align: right;
-    color: var(--text);
-    font-weight: 600;
-  }
-  .pct-cell.muted {
-    color: var(--muted);
-    font-weight: 400;
-  }
-  .safety-cell {
-    text-align: right;
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .safety-cell.blocked {
-    color: var(--danger);
-  }
+    .main-wrap {
+      width: 100%;
+      max-width: 920px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      z-index: 10;
+      margin: auto 0;
+    }
 
-  details.inspector {
-    border-top: 1px solid var(--border-subtle);
-    padding-top: 14px;
-  }
-  details.inspector summary {
-    cursor: pointer;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--muted);
-    user-select: none;
-    list-style: none;
-  }
-  details.inspector summary::-webkit-details-marker {
-    display: none;
-  }
-  details.inspector summary:hover {
-    color: var(--text);
-  }
-  pre#payload-view {
-    margin: 12px 0 0;
-    padding: 12px 14px;
-    background: var(--surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: 6px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    line-height: 1.45;
-    color: var(--text);
-    max-height: 240px;
-    overflow: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-</style>
+    /* Compact Header Bar */
+    .header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 0 2px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-title {
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--text-bright);
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-title span.slash {
+      color: var(--cyan);
+    }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .led {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .led.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .led.warn { background: var(--orange); box-shadow: 0 0 6px var(--orange); }
+    .led.err { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+    .hud-strip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .hud-stat {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 9px;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+    .hud-key {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+    .hud-val {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text-bright);
+    }
+    .hud-val.cyan { color: var(--cyan); }
+    .hud-val.green { color: var(--green); }
+    .hud-val.orange { color: var(--orange); }
+
+    .btn-mini {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 3px 8px;
+      transition: all 0.15s;
+    }
+    .btn-mini:hover {
+      color: var(--cyan);
+      border-color: var(--cyan);
+    }
+
+    /* Collapsible Endpoint Config Bar */
+    .endpoint-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 11.5px;
+    }
+    .endpoint-bar[hidden] {
+      display: none !important;
+    }
+    .endpoint-bar label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .inline-input {
+      background: var(--box-bg);
+      border: 1.5px solid #0284c7;
+      color: var(--yellow);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 3px;
+      outline: none;
+    }
+    .inline-input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 8px rgba(0, 229, 255, 0.35);
+    }
+
+    /* 2-Stage Arena Grid with Laser Conduit */
+    .stage-grid {
+      display: grid;
+      grid-template-columns: 390px 32px 1fr;
+      align-items: stretch;
+      gap: 0;
+    }
+
+    .cyber-card {
+      background: var(--card-bg);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .node-arena {
+      border-color: var(--cyan);
+      box-shadow: inset 0 0 16px rgba(0, 229, 255, 0.06), 0 4px 18px rgba(0, 0, 0, 0.5);
+    }
+    .node-arena .card-title {
+      color: var(--cyan);
+    }
+
+    .node-jev {
+      border-color: var(--orange);
+      box-shadow: inset 0 0 16px rgba(255, 152, 0, 0.06), 0 4px 18px rgba(0, 0, 0, 0.5);
+    }
+    .node-jev .card-title {
+      color: var(--orange);
+    }
+    .node-jev.live-ok {
+      border-color: var(--green);
+      box-shadow: inset 0 0 18px rgba(16, 185, 129, 0.12), 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+    .node-jev.live-ok .card-title {
+      color: var(--green);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+    }
+    .card-meta {
+      font-size: 11px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* High-DPI Board Canvas */
+    .canvas-box {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: var(--box-bg);
+      border: 1px solid var(--border-inner);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    canvas#board {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Action Buttons inside Arena Card */
+    .action-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .btn-fire {
+      background: #0284c7;
+      border: 1.5px solid var(--blue);
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      padding: 8px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .btn-fire:hover {
+      background: var(--orange);
+      border-color: var(--orange);
+      color: #000000;
+      box-shadow: 0 0 12px rgba(255, 152, 0, 0.45);
+    }
+    .btn-fire.active-run {
+      background: var(--green);
+      border-color: var(--green);
+      color: #000000;
+    }
+
+    .btn-sec {
+      background: var(--box-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 700;
+      padding: 8px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-sec:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+    .btn-sec.mask-on {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    /* Laser Conduit between Stage 01 and Stage 02 */
+    .laser-pipe {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .laser-line {
+      width: 100%;
+      height: 3px;
+      background: #141f33;
+      position: relative;
+      overflow: hidden;
+    }
+    .laser-bolt {
+      position: absolute;
+      top: -1px; left: -100%;
+      width: 100%; height: 5px;
+      background: linear-gradient(90deg, transparent, var(--cyan), #ffffff, transparent);
+      box-shadow: 0 0 10px var(--cyan);
+    }
+    .laser-pipe.pulse .laser-bolt {
+      animation: laserShoot 0.28s linear;
+    }
+    @keyframes laserShoot {
+      0% { left: -100%; }
+      100% { left: 100%; }
+    }
+
+    /* Stage 02 Internal Boxes */
+    .jev-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+      justify-content: space-between;
+    }
+
+    .prompt-box {
+      background: var(--box-bg);
+      border: 1px solid var(--border-inner);
+      border-radius: 4px;
+      padding: 6px 9px;
+      text-align: left;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .box-label {
+      font-size: 9.5px;
+      font-weight: 800;
+      color: var(--orange);
+      letter-spacing: 0.06em;
+      margin-bottom: 2px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .prompt-text {
+      color: var(--text);
+    }
+
+    /* 4-Bar Probability Distribution Box */
+    .probs-box {
+      background: var(--box-bg);
+      border: 1px solid var(--border-inner);
+      border-radius: 4px;
+      padding: 8px 10px;
+    }
+    .prob-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-top: 4px;
+    }
+    .prob-row {
+      display: grid;
+      grid-template-columns: 58px 72px 1fr 52px;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      font-variant-numeric: tabular-nums;
+    }
+    .dir-tag {
+      font-weight: 700;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .dir-tag.chosen {
+      color: var(--cyan);
+      font-weight: 800;
+    }
+    .safety-tag {
+      font-size: 10.5px;
+      color: var(--muted);
+    }
+    .safety-tag.safe { color: var(--green); }
+    .safety-tag.blocked { color: var(--red); }
+
+    .bar-track {
+      height: 7px;
+      background: #0d1522;
+      border: 1px solid #1e293b;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    html.light .bar-track {
+      background: #e2e8f0;
+      border-color: #cbd5e1;
+    }
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      background: #475569;
+      transition: width 90ms linear, background-color 90ms linear;
+    }
+    .bar-fill.chosen {
+      background: var(--cyan);
+      box-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
+    }
+    .bar-fill.danger {
+      background: var(--red);
+    }
+    .prob-num {
+      text-align: right;
+      font-weight: 700;
+      color: var(--text-bright);
+    }
+    .prob-num.dim {
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    /* Syntax-Highlighted JSON State & Output Box */
+    .json-code-box {
+      background: var(--box-bg);
+      border: 1px solid var(--border-inner);
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-size: 11.5px;
+      line-height: 1.42;
+      color: var(--muted);
+      text-align: left;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    pre.syntax-pre {
+      margin: 0;
+      font-family: inherit;
+      font-size: 11px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--text);
+    }
+    .j-bracket { color: #64748b; }
+    .j-key { color: var(--blue); font-weight: 600; }
+    .j-str { color: #86efac; }
+    .j-num { color: var(--yellow); font-weight: 700; }
+    html.light .j-str { color: #059669; }
+    html.light .j-num { color: #b45309; }
+
+    @media (max-width: 820px) {
+      .stage-grid {
+        display: flex;
+        flex-direction: column;
+      }
+      .laser-pipe {
+        height: 18px;
+        width: 100%;
+      }
+      .laser-line {
+        width: 3px;
+        height: 100%;
+        margin: 0 auto;
+      }
+    }
+  </style>
 </head>
 <body>
-<div class="shell">
-  <header class="topbar">
-    <div class="brand">
-      <span class="brand-title">djev <span class="brand-sep">/</span> snake</span>
-      <span class="status-line">
-        <span id="dot" class="dot"></span>
-        <span id="status-text">Idle · ready</span>
-      </span>
-    </div>
-    <div class="toolbar">
-      <button id="btn-config" class="ghost" type="button">Endpoint</button>
-      <button id="btn-theme" class="ghost" type="button">Theme</button>
-      <button id="btn-start" class="primary" type="button">Start</button>
-      <button id="btn-step" type="button">Step</button>
-      <button id="btn-reset" type="button">Reset</button>
-    </div>
-  </header>
 
-  <div id="config-drawer" class="config-drawer" hidden>
-    <label>
-      URL
-      <input id="endpoint" type="text" style="width: 320px" placeholder="/v1/systemone or https://...run.app">
-    </label>
-    <label>
-      Bearer Token
-      <input id="token" type="password" style="width: 180px" placeholder="optional API_KEY">
-    </label>
+  <div class="main-wrap">
+    <!-- Compact Header with Inline Scoreboard HUD -->
+    <div class="header-bar">
+      <div class="header-left">
+        <div class="header-title">
+          djev <span class="slash">//</span> snake
+        </div>
+        <div class="status-chip">
+          <span id="dot" class="led"></span>
+          <span id="status-text">IDLE · READY</span>
+        </div>
+      </div>
+
+      <div class="hud-strip">
+        <div class="hud-stat">
+          <span class="hud-key">SCORE</span>
+          <span id="m-score" class="hud-val green">0</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-key">LEN</span>
+          <span id="m-len" class="hud-val cyan">4</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-key">STEP</span>
+          <span id="m-steps" class="hud-val">0</span>
+        </div>
+        <div class="hud-stat">
+          <span class="hud-key">LATENCY</span>
+          <span id="m-ms" class="hud-val orange">-- ms</span>
+        </div>
+        <button class="btn-mini" id="btn-config" type="button">[Endpoint]</button>
+        <button class="btn-mini" id="btn-theme" type="button">[Theme]</button>
+      </div>
+    </div>
+
+    <!-- Optional Endpoint Bar (toggled via [Endpoint]) -->
+    <div id="config-drawer" class="endpoint-bar" hidden>
+      <label>
+        POST Endpoint
+        <input id="endpoint" class="inline-input" style="width: 310px" spellcheck="false">
+      </label>
+      <label>
+        Bearer Token
+        <input id="token" type="password" class="inline-input" style="width: 150px" placeholder="optional API_KEY">
+      </label>
+    </div>
+
+    <!-- 2-Stage Arena Grid -->
+    <div class="stage-grid">
+
+      <!-- STAGE 01: SNAKE ARENA -->
+      <div class="cyber-card node-arena">
+        <div>
+          <div class="card-top">
+            <span class="card-title">01 // SNAKE ARENA (12x12)</span>
+            <span class="card-meta" id="coords-text">head [5,6] · food [9,3]</span>
+          </div>
+
+          <div class="canvas-box">
+            <canvas id="board"></canvas>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button class="btn-fire" id="btn-start" type="button">▶ START AUTOPILOT</button>
+          <button class="btn-sec" id="btn-step" type="button">Step ↵</button>
+          <button class="btn-sec mask-on" id="btn-mask" type="button" title="Restrict argmax choice to safe_moves">Mask: ON</button>
+          <button class="btn-sec" id="btn-reset" type="button" title="Reset board (R)">↺</button>
+        </div>
+      </div>
+
+      <!-- LASER CONDUIT -->
+      <div class="laser-pipe" id="pipe">
+        <div class="laser-line">
+          <div class="laser-bolt"></div>
+        </div>
+      </div>
+
+      <!-- STAGE 02: TYPESAFE-AI / JEV ENGINE -->
+      <div class="cyber-card node-jev" id="node-jev">
+        <div class="card-top">
+          <span class="card-title">02 // typesafe-ai/jev</span>
+          <span class="card-meta" id="engine-tag">POST /v1/systemone · samples=1</span>
+        </div>
+
+        <div class="jev-stack">
+          <!-- Rule / Question Prompt -->
+          <div class="prompt-box">
+            <div class="box-label">
+              <span>QUESTION SCHEMA (move: choice)</span>
+              <span id="rate-tag" style="color: var(--muted)">0.0 ticks/s</span>
+            </div>
+            <div class="prompt-text">"Pick a direction in safe_moves that minimizes manhattan_to_food while keeping open_space open."</div>
+          </div>
+
+          <!-- Live 4-Direction Probability Bars -->
+          <div class="probs-box">
+            <div class="box-label">
+              <span>CALIBRATED SLOT PROBABILITIES</span>
+              <span id="choice-badge" style="color: var(--cyan)">argmax: right (50.0%)</span>
+            </div>
+            <div class="prob-grid">
+              <div class="prob-row">
+                <span class="dir-tag" id="name-up">↑ up</span>
+                <span class="safety-tag safe" id="safe-up">safe d=7</span>
+                <div class="bar-track"><div class="bar-fill" id="bar-up"></div></div>
+                <span class="prob-num dim" id="val-up">25.0%</span>
+              </div>
+              <div class="prob-row">
+                <span class="dir-tag" id="name-down">↓ down</span>
+                <span class="safety-tag safe" id="safe-down">safe d=9</span>
+                <div class="bar-track"><div class="bar-fill" id="bar-down"></div></div>
+                <span class="prob-num dim" id="val-down">25.0%</span>
+              </div>
+              <div class="prob-row">
+                <span class="dir-tag" id="name-left">← left</span>
+                <span class="safety-tag blocked" id="safe-left">neck</span>
+                <div class="bar-track"><div class="bar-fill" id="bar-left"></div></div>
+                <span class="prob-num dim" id="val-left">0.0%</span>
+              </div>
+              <div class="prob-row">
+                <span class="dir-tag chosen" id="name-right">→ right</span>
+                <span class="safety-tag safe" id="safe-right">safe d=6</span>
+                <div class="bar-track"><div class="bar-fill chosen" id="bar-right"></div></div>
+                <span class="prob-num" id="val-right">50.0%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Syntax-Highlighted Live State & Jev Output Box -->
+          <div class="json-code-box">
+            <div class="box-label">
+              <span>LIVE TELEMETRY PAYLOAD (STATE -> ANSWERS.MOVE)</span>
+              <span id="shield-tag" style="color: var(--green)">shield: 0</span>
+            </div>
+            <pre class="syntax-pre" id="live-json"></pre>
+          </div>
+        </div>
+      </div>
+
+    </div>
   </div>
-
-  <main class="workspace">
-    <div class="board-wrap">
-      <canvas id="board"></canvas>
-      <div class="board-caption">
-        <span id="coords-text">head [5, 6] · food [9, 3]</span>
-        <span>space: play/pause · r: reset</span>
-      </div>
-    </div>
-
-    <div class="readout">
-      <div class="metrics-row">
-        <div>
-          <div class="metric-label">Score</div>
-          <div id="m-score" class="metric-value">0</div>
-        </div>
-        <div>
-          <div class="metric-label">Step</div>
-          <div id="m-steps" class="metric-value">0</div>
-        </div>
-        <div>
-          <div class="metric-label">Latency</div>
-          <div class="metric-value"><span id="m-ms">0</span><span class="metric-unit">ms</span></div>
-        </div>
-      </div>
-
-      <div class="section-head">
-        <span class="section-title">POST /v1/systemone probabilities</span>
-        <label class="mask-toggle">
-          <input id="chk-mask" type="checkbox" checked>
-          <span>safe mask</span>
-        </label>
-      </div>
-
-      <div class="prob-table">
-        <div class="prob-row">
-          <div class="dir-cell" id="name-up"><span class="dir-arrow">↑</span><span>up</span></div>
-          <div class="meter-track"><div class="meter-fill" id="bar-up"></div></div>
-          <div class="pct-cell muted" id="val-up">25.0%</div>
-          <div class="safety-cell" id="safe-up">safe</div>
-        </div>
-        <div class="prob-row">
-          <div class="dir-cell" id="name-down"><span class="dir-arrow">↓</span><span>down</span></div>
-          <div class="meter-track"><div class="meter-fill" id="bar-down"></div></div>
-          <div class="pct-cell muted" id="val-down">25.0%</div>
-          <div class="safety-cell" id="safe-down">safe</div>
-        </div>
-        <div class="prob-row">
-          <div class="dir-cell" id="name-left"><span class="dir-arrow">←</span><span>left</span></div>
-          <div class="meter-track"><div class="meter-fill" id="bar-left"></div></div>
-          <div class="pct-cell muted" id="val-left">0.0%</div>
-          <div class="safety-cell blocked" id="safe-left">neck</div>
-        </div>
-        <div class="prob-row">
-          <div class="dir-cell active" id="name-right"><span class="dir-arrow">→</span><span>right</span></div>
-          <div class="meter-track"><div class="meter-fill active" id="bar-right"></div></div>
-          <div class="pct-cell" id="val-right">50.0%</div>
-          <div class="safety-cell" id="safe-right">safe</div>
-        </div>
-      </div>
-
-      <details class="inspector">
-        <summary>▸ Inspect live state and response JSON</summary>
-        <pre id="payload-view"></pre>
-      </details>
-    </div>
-  </main>
-</div>
 
 <script>
 const GRID = 12;
-const CSS_SIZE = 400;
+const CSS_SIZE = 366;
 const DIRS = ["up", "down", "left", "right"];
+const ARROWS = { up: "↑", down: "↓", left: "←", right: "→" };
 const VEC = {
   up: [0, -1],
   down: [0, 1],
@@ -589,10 +749,9 @@ $("btn-config").onclick = () => {
 
 $("btn-theme").onclick = () => {
   const root = document.documentElement;
-  const isDark = root.classList.contains("dark") ||
-    (!root.classList.contains("light") && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  root.classList.toggle("dark", !isDark);
-  root.classList.toggle("light", isDark);
+  const isLight = root.classList.contains("light");
+  root.classList.toggle("light", !isLight);
+  root.classList.toggle("dark", isLight);
   drawBoard();
 };
 
@@ -612,10 +771,26 @@ let nextChoice = "right";
 let food = [9, 3];
 let score = 0;
 let steps = 0;
+let shieldCount = 0;
+let maskEnabled = true;
 let alive = true;
 let running = false;
 let inflight = false;
 let sandboxFallback = false;
+let recentTicks = [];
+
+$("btn-mask").onclick = () => {
+  maskEnabled = !maskEnabled;
+  $("btn-mask").textContent = maskEnabled ? "Mask: ON" : "Mask: OFF";
+  $("btn-mask").className = "btn-sec" + (maskEnabled ? " mask-on" : "");
+};
+
+function pulseLaser() {
+  const p = $("pipe");
+  p.classList.remove("pulse");
+  void p.offsetWidth;
+  p.classList.add("pulse");
+}
 
 function spawnFood(body) {
   const occupied = new Set(body.map(([x, y]) => x + "," + y));
@@ -756,7 +931,7 @@ function simulateSystemOne(state) {
     }
   }
   return {
-    model: "dgemma-sandbox",
+    model: "dgemma-sim",
     answers: {
       move: {
         type: "choice",
@@ -764,10 +939,6 @@ function simulateSystemOne(state) {
         probabilities: probs,
         confidence: bestP
       }
-    },
-    diagnostics: {
-      mode: "sandbox_fallback",
-      timing: { reads: 1, total_ms: 12.0 }
     }
   };
 }
@@ -785,6 +956,7 @@ async function requestDecision(state) {
   const tok = $("token").value.trim();
   if (tok) headers["authorization"] = "Bearer " + tok;
 
+  pulseLaser();
   const t0 = performance.now();
   try {
     const resp = await fetch(resolveEndpointUrl(), {
@@ -798,28 +970,61 @@ async function requestDecision(state) {
       throw new Error((data.error && data.error.message) || ("HTTP " + resp.status));
     }
     sandboxFallback = false;
-    return { reqBody, data, ms };
+    return { data, ms };
   } catch (err) {
-    const ms = Math.max(9, Math.round(performance.now() - t0));
+    const ms = Math.max(8, Math.round(performance.now() - t0));
     sandboxFallback = true;
     const data = simulateSystemOne(state);
-    return { reqBody, data, ms };
+    return { data, ms };
   }
 }
 
 function setStatus(text, kind) {
   $("status-text").textContent = text;
-  $("dot").className = "dot" + (kind ? " " + kind : "");
+  $("dot").className = "led" + (kind ? " " + kind : "");
+  $("node-jev").className = "cyber-card node-jev" + (kind === "live" ? " live-ok" : "");
 }
 
-function updateUI(state, probs, finalChoice, ms) {
+function renderSyntaxJson(state, finalChoice, probs) {
+  const safeStr = state.safe_moves.map(m => `<span class="j-str">"${m}"</span>`).join(", ");
+  const pVal = (probs[finalChoice] || 0).toFixed(3);
+  $("live-json").innerHTML =
+`<span class="j-bracket">{</span>
+  <span class="j-key">"state"</span>: <span class="j-bracket">{</span>
+    <span class="j-key">"head"</span>: [<span class="j-num">${state.head[0]}</span>, <span class="j-num">${state.head[1]}</span>], <span class="j-key">"food"</span>: [<span class="j-num">${state.food[0]}</span>, <span class="j-num">${state.food[1]}</span>],
+    <span class="j-key">"delta"</span>: <span class="j-bracket">{</span> <span class="j-key">"dx"</span>: <span class="j-num">${state.food_delta.dx}</span>, <span class="j-key">"dy"</span>: <span class="j-num">${state.food_delta.dy}</span>, <span class="j-key">"pref"</span>: <span class="j-str">"${state.food_delta.preferred_horizontal}/${state.food_delta.preferred_vertical}"</span> <span class="j-bracket">}</span>,
+    <span class="j-key">"safe_moves"</span>: [${safeStr}]
+  <span class="j-bracket">}</span>,
+  <span class="j-key">"answers.move"</span>: <span class="j-bracket">{</span> <span class="j-key">"choice"</span>: <span class="j-str">"${finalChoice}"</span>, <span class="j-key">"confidence"</span>: <span class="j-num">${pVal}</span> <span class="j-bracket">}</span>
+<span class="j-bracket">}</span>`;
+}
+
+function updateUI(state, probs, rawChoice, finalChoice, ms) {
   $("m-score").textContent = String(score);
+  $("m-len").textContent = String(snake.length);
   $("m-steps").textContent = String(steps);
-  $("m-ms").textContent = String(ms);
+  $("m-ms").textContent = ms > 0 ? `${ms} ms` : "-- ms";
+  $("shield-tag").textContent = `shield: ${shieldCount}`;
+
+  const now = performance.now();
+  if (ms > 0) {
+    recentTicks.push(now);
+    while (recentTicks.length > 1 && now - recentTicks[0] > 3000) {
+      recentTicks.shift();
+    }
+  }
+  const rate = recentTicks.length > 1
+    ? ((recentTicks.length - 1) * 1000 / (now - recentTicks[0])).toFixed(1)
+    : "0.0";
+  $("rate-tag").textContent = `${rate} ticks/s`;
 
   const [hx, hy] = state.head;
   const [fx, fy] = state.food;
-  $("coords-text").textContent = `head [${hx}, ${hy}] · food [${fx}, ${fy}]`;
+  $("coords-text").textContent = `head [${hx},${hy}] · food [${fx},${fy}]`;
+
+  const chosenPct = ((probs[finalChoice] || 0) * 100).toFixed(1) + "%";
+  const maskSuffix = rawChoice !== finalChoice ? ` [masked ${rawChoice}]` : "";
+  $("choice-badge").textContent = `argmax: ${finalChoice} (${chosenPct})${maskSuffix}`;
 
   for (const d of DIRS) {
     const p = Math.max(0, Math.min(1, Number(probs[d] || 0)));
@@ -827,18 +1032,22 @@ function updateUI(state, probs, finalChoice, ms) {
     const info = state.move_analysis[d];
     const isSelected = d === finalChoice;
 
-    $("name-" + d).className = "dir-cell" + (isSelected ? " active" : "");
-    $("val-" + d).className = "pct-cell" + (isSelected ? "" : " muted");
-    $("val-" + d).textContent = pct;
+    $("name-" + d).className = "dir-tag" + (isSelected ? " chosen" : "");
+    $("name-" + d).textContent = `${ARROWS[d]} ${d}`;
 
     const safeEl = $("safe-" + d);
-    safeEl.textContent = info.safe ? "safe" : info.reason;
-    safeEl.className = "safety-cell" + (info.safe ? "" : " blocked");
+    safeEl.textContent = info.safe ? `safe d=${info.manhattan_to_food}` : info.reason;
+    safeEl.className = "safety-tag " + (info.safe ? "safe" : "blocked");
 
     const barEl = $("bar-" + d);
     barEl.style.width = (p * 100).toFixed(1) + "%";
-    barEl.className = "meter-fill" + (isSelected ? (info.safe ? " active" : " danger") : "");
+    barEl.className = "bar-fill" + (isSelected ? (info.safe ? " chosen" : " danger") : "");
+
+    $("val-" + d).className = "prob-num" + (isSelected ? "" : " dim");
+    $("val-" + d).textContent = pct;
   }
+
+  renderSyntaxJson(state, finalChoice, probs);
 }
 
 function drawBoard() {
@@ -857,18 +1066,17 @@ function drawBoard() {
   const H = CSS_SIZE;
   const cell = W / GRID;
   const styles = getComputedStyle(document.documentElement);
-  const bg = styles.getPropertyValue("--board-bg").trim() || "#0d1117";
-  const dotCol = styles.getPropertyValue("--board-dot").trim() || "#30363d";
-  const gridCol = styles.getPropertyValue("--board-grid").trim() || "#161b22";
-  const headCol = styles.getPropertyValue("--snake-head").trim() || "#2f81f7";
-  const bodyCol = styles.getPropertyValue("--snake-body").trim() || "#1f6feb";
-  const foodCol = styles.getPropertyValue("--ok").trim() || "#3fb950";
-  const accentCol = styles.getPropertyValue("--accent").trim() || "#2f81f7";
+  const bg = styles.getPropertyValue("--box-bg").trim() || "#020408";
+  const gridCol = styles.getPropertyValue("--grid-line").trim() || "#0b121e";
+  const dotCol = styles.getPropertyValue("--grid-dot").trim() || "#1e293b";
+  const cyanCol = styles.getPropertyValue("--cyan").trim() || "#00e5ff";
+  const blueCol = styles.getPropertyValue("--blue").trim() || "#38bdf8";
+  const greenCol = styles.getPropertyValue("--green").trim() || "#10b981";
 
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  // Subtle hairline grid + intersection dot matrix
+  // Subtle grid lines + intersection dots
   ctx.strokeStyle = gridCol;
   ctx.lineWidth = 1;
   for (let i = 1; i < GRID; i++) {
@@ -886,67 +1094,61 @@ function drawBoard() {
   for (let y = 1; y < GRID; y++) {
     for (let x = 1; x < GRID; x++) {
       ctx.beginPath();
-      ctx.arc(x * cell, y * cell, 1.1, 0, Math.PI * 2);
+      ctx.arc(x * cell, y * cell, 1.0, 0, Math.PI * 2);
       ctx.fill();
     }
   }
 
-  // Ghost vector line from head toward chosen next cell
+  // Chosen vector guide line
   if (snake.length > 0 && alive && nextChoice) {
     const [hx, hy] = snake[0];
     const [vx, vy] = VEC[nextChoice] || [0, 0];
-    const cx = (hx + 0.5) * cell;
-    const cy = (hy + 0.5) * cell;
-    const tx = (hx + vx + 0.5) * cell;
-    const ty = (hy + vy + 0.5) * cell;
-    ctx.strokeStyle = accentCol;
-    ctx.globalAlpha = 0.28;
+    ctx.strokeStyle = cyanCol;
+    ctx.globalAlpha = 0.35;
     ctx.lineWidth = 2;
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(tx, ty);
+    ctx.moveTo((hx + 0.5) * cell, (hy + 0.5) * cell);
+    ctx.lineTo((hx + vx + 0.5) * cell, (hy + vy + 0.5) * cell);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.globalAlpha = 1.0;
   }
 
-  // Target food with crisp subtle ring
+  // Target Apple (Green glowing node)
   const [fx, fy] = food;
   const fcx = (fx + 0.5) * cell;
   const fcy = (fy + 0.5) * cell;
-  ctx.strokeStyle = foodCol;
-  ctx.globalAlpha = 0.25;
+  ctx.strokeStyle = greenCol;
+  ctx.globalAlpha = 0.32;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.arc(fcx, fcy, cell * 0.36, 0, Math.PI * 2);
   ctx.stroke();
   ctx.globalAlpha = 1.0;
-  ctx.fillStyle = foodCol;
+  ctx.fillStyle = greenCol;
   ctx.beginPath();
   ctx.arc(fcx, fcy, cell * 0.24, 0, Math.PI * 2);
   ctx.fill();
 
-  // Snake body segments
+  // Snake Body Segments
   for (let i = snake.length - 1; i >= 0; i--) {
     const [sx, sy] = snake[i];
     const isHead = i === 0;
-    ctx.fillStyle = isHead ? headCol : bodyCol;
-    ctx.globalAlpha = isHead ? 1.0 : Math.max(0.42, 0.9 - (i / (snake.length + 5)) * 0.48);
-    const pad = isHead ? cell * 0.09 : cell * 0.14;
-    const radius = isHead ? 6 : 4;
+    ctx.fillStyle = isHead ? cyanCol : blueCol;
+    ctx.globalAlpha = isHead ? 1.0 : Math.max(0.38, 0.88 - (i / (snake.length + 5)) * 0.45);
+    const pad = isHead ? cell * 0.08 : cell * 0.14;
     ctx.beginPath();
-    ctx.roundRect(sx * cell + pad, sy * cell + pad, cell - pad * 2, cell - pad * 2, radius);
+    ctx.roundRect(sx * cell + pad, sy * cell + pad, cell - pad * 2, cell - pad * 2, isHead ? 5 : 3);
     ctx.fill();
 
-    // Head direction indicator dots
     if (isHead) {
-      ctx.globalAlpha = 0.95;
-      ctx.fillStyle = "#ffffff";
+      ctx.globalAlpha = 1.0;
+      ctx.fillStyle = "#020408";
       const [vx, vy] = VEC[direction] || [1, 0];
       const hcx = (sx + 0.5) * cell;
       const hcy = (sy + 0.5) * cell;
-      const fwd = cell * 0.17;
+      const fwd = cell * 0.16;
       const side = cell * 0.13;
       const px = -vy, py = vx;
       ctx.beginPath();
@@ -969,8 +1171,9 @@ function applyMove(chosenDir) {
   if (nx < 0 || nx >= GRID || ny < 0 || ny >= GRID || bodyObstacles.has(nx + "," + ny)) {
     alive = false;
     running = false;
-    $("btn-start").textContent = "Start";
-    setStatus(`Collision on ${chosenDir}`, "err");
+    $("btn-start").textContent = "▶ START AUTOPILOT";
+    $("btn-start").classList.remove("active-run");
+    setStatus(`COLLISION (${chosenDir.toUpperCase()})`, "err");
     drawBoard();
     return;
   }
@@ -988,22 +1191,20 @@ function applyMove(chosenDir) {
 
 function resetGame() {
   running = false;
-  $("btn-start").textContent = "Start";
+  $("btn-start").textContent = "▶ START AUTOPILOT";
+  $("btn-start").classList.remove("active-run");
   snake = [[5, 6], [4, 6], [3, 6], [2, 6]];
   direction = "right";
   nextChoice = "right";
   score = 0;
   steps = 0;
+  shieldCount = 0;
+  recentTicks = [];
   alive = true;
   food = spawnFood(snake);
-  setStatus("Idle · ready", "");
+  setStatus("IDLE · READY", "");
   const st = buildState();
-  updateUI(st, { up: 0.25, down: 0.25, left: 0.0, right: 0.50 }, "right", 0);
-  $("payload-view").textContent = JSON.stringify(
-    { state: st, questions: QUESTIONS_SCHEMA },
-    null,
-    2
-  );
+  updateUI(st, { up: 0.25, down: 0.25, left: 0.0, right: 0.50 }, "right", "right", 0);
   drawBoard();
 }
 
@@ -1011,34 +1212,29 @@ async function stepOnce() {
   if (inflight || !alive) return;
   inflight = true;
   const state = buildState();
-  const { reqBody, data, ms } = await requestDecision(state);
+  const { data, ms } = await requestDecision(state);
   const moveAns = (data.answers && data.answers.move) || {};
   const probs = moveAns.probabilities || { up: 0.25, down: 0.25, left: 0.25, right: 0.25 };
   const rawChoice = moveAns.choice || DIRS.reduce((a, b) => (probs[a] >= probs[b] ? a : b));
 
   let finalChoice = rawChoice;
-  if ($("chk-mask").checked && state.safe_moves.length > 0) {
+  if (maskEnabled && state.safe_moves.length > 0) {
     if (!state.safe_moves.includes(rawChoice)) {
+      shieldCount += 1;
       finalChoice = state.safe_moves.reduce((a, b) => ((probs[a] || 0) >= (probs[b] || 0) ? a : b));
     }
   }
   nextChoice = finalChoice;
 
-  $("payload-view").textContent = JSON.stringify(
-    { request: reqBody, response: data },
-    null,
-    2
-  );
-
   applyMove(finalChoice);
   if (alive) {
     if (sandboxFallback) {
-      setStatus(`Simulated · ${ms} ms`, "warn");
+      setStatus(`SIMULATED · ${ms} MS`, "warn");
     } else {
-      setStatus(`Live · ${data.model || "dgemma"} · ${ms} ms`, "live");
+      setStatus(`LIVE · ${(data.model || "DGEMMA").toUpperCase()}`, "live");
     }
   }
-  updateUI(state, probs, finalChoice, ms);
+  updateUI(state, probs, rawChoice, finalChoice, ms);
   drawBoard();
   inflight = false;
 }
@@ -1057,18 +1253,20 @@ async function loop() {
 $("btn-start").onclick = () => {
   if (!alive) resetGame();
   running = !running;
-  $("btn-start").textContent = running ? "Pause" : "Start";
+  $("btn-start").textContent = running ? "⏸ PAUSE AUTOPILOT" : "▶ START AUTOPILOT";
+  $("btn-start").classList.toggle("active-run", running);
   if (running) {
     loop();
   } else {
-    setStatus("Paused", "");
+    setStatus("PAUSED", "");
   }
 };
 
 $("btn-step").onclick = async () => {
   if (!alive) resetGame();
   running = false;
-  $("btn-start").textContent = "Start";
+  $("btn-start").textContent = "▶ START AUTOPILOT";
+  $("btn-start").classList.remove("active-run");
   await stepOnce();
 };
 
@@ -1084,12 +1282,6 @@ window.addEventListener("keydown", e => {
     resetGame();
   }
 });
-
-new MutationObserver(() => drawBoard()).observe(document.documentElement, {
-  attributes: true,
-  attributeFilter: ["class"]
-});
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => drawBoard());
 
 resetGame();
 </script>
