@@ -47,13 +47,14 @@ gcloud beta run deploy djev-dgemma \
   --add-volume=name=weights,type=cloud-storage,bucket="${BUCKET}",readonly=false,mount-options=enable-buffered-read=true \
   --add-volume-mount=volume=weights,mount-path=/mnt/gcs \
   --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=5,periodSeconds=2,timeoutSeconds=2,failureThreshold=120 \
-  --set-env-vars="MODEL=/mnt/gcs/dgemma,CANVAS=128,MAX_SEQS=32,MAX_MODEL_LEN=4096,GPU_UTIL=0.40,KV_CACHE_GB=2,ATTN=TRITON_ATTN,COPY_TO_SHM=1,ENFORCE_EAGER=1,DISABLE_MM=1,TORCH_COMPILE_DISABLE=1,VLLM_WORKER_MULTIPROC_METHOD=fork,VLLM_UF_EAGER_ALL=1,VLLM_FLASHINFER_MOE_BACKEND=masked_gemm,CUDA_MODULE_LOADING=LAZY"
+  --set-env-vars="MODEL=/mnt/gcs/dgemma,CANVAS=128,MAX_SEQS=32,MAX_MODEL_LEN=4096,GPU_UTIL=0.40,KV_CACHE_GB=2,ATTN=TRITON_ATTN,TEST_PAGE=1,COPY_TO_SHM=1,ENFORCE_EAGER=1,DISABLE_MM=1,TORCH_COMPILE_DISABLE=1,VLLM_WORKER_MULTIPROC_METHOD=fork,VLLM_UF_EAGER_ALL=1,VLLM_FLASHINFER_MOE_BACKEND=masked_gemm,CUDA_MODULE_LOADING=LAZY"
 
 # --image=ghcr.io/taeold/djev-run:latest: prebuilt from github.com/mmastrac/djev-spark (upstream does not publish a registry image)
 # --no-gpu-zonal-redundancy: required for standard regional RTX PRO 6000 quota
 # --no-cpu-throttling: keeps all 20 vCPUs active during weight loading and vLLM scheduling
 # --network=default --subnet=default --vpc-egress=all-traffic: streams weights from GCS over Google internal networking (~1.05 GiB/s)
 # mount-options=enable-buffered-read=true: prefetches 18 GB safetensors shards sequentially from GCS
+# TEST_PAGE=1: enables the built-in /snake and /playground web UIs
 # COPY_TO_SHM=1: stages the 17.5 GB model into /dev/shm RAM in the background while Python imports torch/vllm
 # VLLM_WORKER_MULTIPROC_METHOD=fork: forks EngineCore from APIServer without re-importing Python
 # ENFORCE_EAGER=1 & TORCH_COMPILE_DISABLE=1: skips torch.compile, CUDA graph capture, and redundant startup profiling
