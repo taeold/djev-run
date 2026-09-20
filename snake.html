@@ -1,700 +1,410 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <title>djev // snake</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>djev / snake</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&display=swap');
-
-    :root {
-      --bg: #04060a;
-      --card-bg: #080c14;
-      --box-bg: #020408;
-      --border: #1e293b;
-      --border-inner: #141c2b;
-      --text: #cbd5e1;
-      --text-bright: #ffffff;
-      --muted: #64748b;
-      --cyan: #00e5ff;
-      --blue: #38bdf8;
-      --orange: #ff9800;
-      --green: #10b981;
-      --yellow: #facc15;
-      --red: #f43f5e;
-      --grid-line: #0b121e;
-      --grid-dot: #1e293b;
-    }
-
-    html.light {
-      --bg: #f1f5f9;
-      --card-bg: #ffffff;
-      --box-bg: #f8fafc;
-      --border: #cbd5e1;
-      --border-inner: #e2e8f0;
-      --text: #1e293b;
-      --text-bright: #0f172a;
-      --muted: #64748b;
-      --cyan: #0284c7;
-      --blue: #0369a1;
-      --orange: #d97706;
-      --green: #059669;
-      --yellow: #ca8a04;
-      --red: #e11d48;
-      --grid-line: #e2e8f0;
-      --grid-dot: #cbd5e1;
-    }
-
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      background: #ffffff;
+      color: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
     }
 
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 13px;
-      min-height: 100vh;
-      min-height: 100dvh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 12px;
-      overflow-x: hidden;
-      position: relative;
+      padding: 16px;
     }
 
-    html.dark body::before {
-      content: " ";
-      display: block;
-      position: fixed;
-      top: 0; left: 0; bottom: 0; right: 0;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.28) 50%);
-      background-size: 100% 4px;
-      z-index: 100;
-      pointer-events: none;
-      opacity: 0.3;
+    .wrap {
+      width: 760px;
+      max-width: 100%;
+      margin: 0 auto;
+      background: #ffffff;
+      color: #0f172a;
     }
 
-    .main-wrap {
-      width: 100%;
-      max-width: 920px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      position: relative;
-      z-index: 10;
-      margin: auto 0;
-    }
-
-    /* Compact Header Bar */
-    .header-bar {
+    /* Single non-wrapping top bar: zero layout shift */
+    .topbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
-      padding: 0 2px;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      height: 40px;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+      gap: 12px;
     }
 
-    .header-left {
+    .top-left {
       display: flex;
       align-items: center;
-      gap: 10px;
+      flex-wrap: nowrap;
+      gap: 12px;
+      min-width: 0;
     }
 
-    .header-title {
-      font-size: 19px;
-      font-weight: 800;
-      color: var(--text-bright);
-      letter-spacing: 0.02em;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .title {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 15px;
+      font-weight: 700;
+      color: #0f172a;
     }
 
-    .header-title span.slash {
-      color: var(--cyan);
-    }
-
-    .status-chip {
+    .status {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--muted);
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      padding: 3px 8px;
-      border-radius: 4px;
+      width: 148px;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: #475569;
       font-variant-numeric: tabular-nums;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
-    .led {
+    .dot {
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: var(--muted);
+      background: #94a3b8;
+      flex-shrink: 0;
     }
-    .led.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
-    .led.warn { background: var(--orange); box-shadow: 0 0 6px var(--orange); }
-    .led.err { background: var(--red); box-shadow: 0 0 6px var(--red); }
+    .dot.live { background: #16a34a; }
+    .dot.warn { background: #d97706; }
+    .dot.err { background: #dc2626; }
 
-    .hud-strip {
+    .metrics {
       display: flex;
       align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .hud-stat {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 3px 9px;
-      display: flex;
-      align-items: baseline;
-      gap: 6px;
-      font-variant-numeric: tabular-nums;
-    }
-    .hud-key {
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--muted);
-      letter-spacing: 0.04em;
-    }
-    .hud-val {
-      font-size: 13px;
-      font-weight: 800;
-      color: var(--text-bright);
-    }
-    .hud-val.cyan { color: var(--cyan); }
-    .hud-val.green { color: var(--green); }
-    .hud-val.orange { color: var(--orange); }
-
-    .btn-mini {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--muted);
-      font-family: inherit;
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
-      padding: 3px 8px;
-      transition: all 0.15s;
-    }
-    .btn-mini:hover {
-      color: var(--cyan);
-      border-color: var(--cyan);
-    }
-
-    /* Collapsible Endpoint Config Bar */
-    .endpoint-bar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 8px 12px;
-      font-size: 11.5px;
-    }
-    .endpoint-bar[hidden] {
-      display: none !important;
-    }
-    .endpoint-bar label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      color: var(--muted);
-      font-weight: 600;
-    }
-    .inline-input {
-      background: var(--box-bg);
-      border: 1.5px solid #0284c7;
-      color: var(--yellow);
-      font-family: inherit;
+      flex-wrap: nowrap;
+      gap: 14px;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
       font-size: 12px;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 3px;
-      outline: none;
-    }
-    .inline-input:focus {
-      border-color: var(--cyan);
-      box-shadow: 0 0 8px rgba(0, 229, 255, 0.35);
-    }
-
-    /* 2-Stage Arena Grid with Laser Conduit */
-    .stage-grid {
-      display: grid;
-      grid-template-columns: 390px 32px 1fr;
-      align-items: stretch;
-      gap: 0;
-    }
-
-    .cyber-card {
-      background: var(--card-bg);
-      border: 1.5px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      position: relative;
-      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .node-arena {
-      border-color: var(--cyan);
-      box-shadow: inset 0 0 16px rgba(0, 229, 255, 0.06), 0 4px 18px rgba(0, 0, 0, 0.5);
-    }
-    .node-arena .card-title {
-      color: var(--cyan);
-    }
-
-    .node-jev {
-      border-color: var(--orange);
-      box-shadow: inset 0 0 16px rgba(255, 152, 0, 0.06), 0 4px 18px rgba(0, 0, 0, 0.5);
-    }
-    .node-jev .card-title {
-      color: var(--orange);
-    }
-    .node-jev.live-ok {
-      border-color: var(--green);
-      box-shadow: inset 0 0 18px rgba(16, 185, 129, 0.12), 0 4px 20px rgba(0, 0, 0, 0.5);
-    }
-    .node-jev.live-ok .card-title {
-      color: var(--green);
-    }
-
-    .card-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      gap: 8px;
-    }
-    .card-title {
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: 0.03em;
-    }
-    .card-meta {
-      font-size: 11px;
-      color: var(--muted);
       font-variant-numeric: tabular-nums;
     }
 
-    /* High-DPI Board Canvas */
-    .canvas-box {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      background: var(--box-bg);
-      border: 1px solid var(--border-inner);
-      border-radius: 4px;
-      overflow: hidden;
+    .metric {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 5px;
     }
-    canvas#board {
-      display: block;
-      width: 100%;
-      height: 100%;
+    .metric-label {
+      color: #64748b;
+      font-weight: 500;
+    }
+    .metric-val {
+      color: #0f172a;
+      font-weight: 700;
+      display: inline-block;
+      text-align: right;
+    }
+    #m-score { width: 24px; }
+    #m-steps { width: 32px; }
+    #m-ms { width: 44px; }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: nowrap;
+      gap: 8px;
+      flex-shrink: 0;
     }
 
-    /* Action Buttons inside Arena Card */
-    .action-row {
-      display: grid;
-      grid-template-columns: 1fr auto auto;
-      gap: 6px;
-      margin-top: 8px;
-    }
-
-    .btn-fire {
-      background: #0284c7;
-      border: 1.5px solid var(--blue);
-      color: #ffffff;
-      font-family: inherit;
-      font-size: 12.5px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
-      padding: 8px 10px;
-      border-radius: 4px;
+    button {
+      height: 30px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 5px;
       cursor: pointer;
       text-align: center;
-      transition: all 0.15s;
-    }
-    .btn-fire:hover {
-      background: var(--orange);
-      border-color: var(--orange);
-      color: #000000;
-      box-shadow: 0 0 12px rgba(255, 152, 0, 0.45);
-    }
-    .btn-fire.active-run {
-      background: var(--green);
-      border-color: var(--green);
-      color: #000000;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
-    .btn-sec {
-      background: var(--box-bg);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 11.5px;
-      font-weight: 700;
-      padding: 8px 10px;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.15s;
+    #btn-start {
+      width: 88px;
+      background: #0969da;
+      color: #ffffff;
+      border: 1px solid #0969da;
     }
-    .btn-sec:hover {
-      border-color: var(--cyan);
-      color: var(--cyan);
-    }
-    .btn-sec.mask-on {
-      border-color: var(--green);
-      color: var(--green);
+    #btn-start:hover {
+      background: #0757b8;
     }
 
-    /* Laser Conduit between Stage 01 and Stage 02 */
-    .laser-pipe {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
+    #btn-reset {
+      width: 72px;
+      background: #f8fafc;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
     }
-    .laser-line {
-      width: 100%;
-      height: 3px;
-      background: #141f33;
-      position: relative;
+    #btn-reset:hover {
+      background: #f1f5f9;
+    }
+
+    /* Main 2-column layout: 360px canvas + 360px right column */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .board-box {
+      width: 360px;
+      height: 360px;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
       overflow: hidden;
     }
-    .laser-bolt {
-      position: absolute;
-      top: -1px; left: -100%;
-      width: 100%; height: 5px;
-      background: linear-gradient(90deg, transparent, var(--cyan), #ffffff, transparent);
-      box-shadow: 0 0 10px var(--cyan);
-    }
-    .laser-pipe.pulse .laser-bolt {
-      animation: laserShoot 0.28s linear;
-    }
-    @keyframes laserShoot {
-      0% { left: -100%; }
-      100% { left: 100%; }
+
+    canvas#board {
+      display: block;
+      width: 360px;
+      height: 360px;
     }
 
-    /* Stage 02 Internal Boxes */
-    .jev-stack {
+    .right-col {
+      height: 360px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      flex: 1;
+      justify-content: space-between;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .panel {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px 12px;
+      color: #0f172a;
+    }
+
+    .probs-panel {
+      height: 173px;
+      display: flex;
+      flex-direction: column;
       justify-content: space-between;
     }
 
-    .prompt-box {
-      background: var(--box-bg);
-      border: 1px solid var(--border-inner);
-      border-radius: 4px;
-      padding: 6px 9px;
-      text-align: left;
+    .json-panel {
+      height: 175px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .panel-sub {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
       font-size: 11px;
-      line-height: 1.35;
-    }
-    .box-label {
-      font-size: 9.5px;
-      font-weight: 800;
-      color: var(--orange);
-      letter-spacing: 0.06em;
-      margin-bottom: 2px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .prompt-text {
-      color: var(--text);
-    }
-
-    /* 4-Bar Probability Distribution Box */
-    .probs-box {
-      background: var(--box-bg);
-      border: 1px solid var(--border-inner);
-      border-radius: 4px;
-      padding: 8px 10px;
-    }
-    .prob-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-      margin-top: 4px;
-    }
-    .prob-row {
-      display: grid;
-      grid-template-columns: 58px 72px 1fr 52px;
-      align-items: center;
-      gap: 8px;
-      font-size: 11.5px;
+      font-weight: 500;
+      color: #475569;
       font-variant-numeric: tabular-nums;
     }
-    .dir-tag {
-      font-weight: 700;
-      color: var(--muted);
+
+    .prob-rows {
       display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .prob-row {
+      display: grid;
+      grid-template-columns: 60px 1fr 52px 46px;
       align-items: center;
-      gap: 4px;
+      gap: 8px;
+      height: 24px;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
     }
-    .dir-tag.chosen {
-      color: var(--cyan);
-      font-weight: 800;
+
+    .dir-name {
+      color: #475569;
+      font-weight: 600;
     }
-    .safety-tag {
-      font-size: 10.5px;
-      color: var(--muted);
+    .dir-name.chosen {
+      color: #0969da;
+      font-weight: 700;
     }
-    .safety-tag.safe { color: var(--green); }
-    .safety-tag.blocked { color: var(--red); }
 
     .bar-track {
-      height: 7px;
-      background: #0d1522;
-      border: 1px solid #1e293b;
-      border-radius: 2px;
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 4px;
       overflow: hidden;
     }
-    html.light .bar-track {
-      background: #e2e8f0;
-      border-color: #cbd5e1;
-    }
+
     .bar-fill {
       height: 100%;
       width: 0%;
-      background: #475569;
-      transition: width 90ms linear, background-color 90ms linear;
+      background: #94a3b8;
+      border-radius: 4px;
+      transition: width 80ms linear;
     }
     .bar-fill.chosen {
-      background: var(--cyan);
-      box-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
-    }
-    .bar-fill.danger {
-      background: var(--red);
-    }
-    .prob-num {
-      text-align: right;
-      font-weight: 700;
-      color: var(--text-bright);
-    }
-    .prob-num.dim {
-      color: var(--muted);
-      font-weight: 400;
+      background: #0969da;
     }
 
-    /* Syntax-Highlighted JSON State & Output Box */
-    .json-code-box {
-      background: var(--box-bg);
-      border: 1px solid var(--border-inner);
-      border-radius: 4px;
+    .prob-pct {
+      text-align: right;
+      color: #0f172a;
+      font-weight: 700;
+    }
+    .prob-pct.dim {
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .safety-tag {
+      text-align: right;
+      font-size: 11px;
+      color: #15803d;
+      font-weight: 600;
+    }
+    .safety-tag.blocked {
+      color: #dc2626;
+    }
+
+    pre#live-json {
+      flex: 1;
+      margin: 0;
       padding: 8px 10px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
       font-size: 11.5px;
       line-height: 1.42;
-      color: var(--muted);
-      text-align: left;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
+      color: #0f172a;
+      overflow: hidden;
+      white-space: pre;
+      font-variant-numeric: tabular-nums;
     }
-    pre.syntax-pre {
-      margin: 0;
-      font-family: inherit;
-      font-size: 11px;
-      line-height: 1.4;
-      white-space: pre-wrap;
-      word-break: break-word;
-      color: var(--text);
-    }
-    .j-bracket { color: #64748b; }
-    .j-key { color: var(--blue); font-weight: 600; }
-    .j-str { color: #86efac; }
-    .j-num { color: var(--yellow); font-weight: 700; }
-    html.light .j-str { color: #059669; }
-    html.light .j-num { color: #b45309; }
 
-    @media (max-width: 820px) {
-      .stage-grid {
-        display: flex;
-        flex-direction: column;
+    .j-key { color: #0550ae; font-weight: 600; }
+    .j-str { color: #116329; }
+    .j-num { color: #953800; font-weight: 600; }
+
+    @media (max-width: 720px) {
+      .main-grid {
+        grid-template-columns: 1fr;
       }
-      .laser-pipe {
-        height: 18px;
+      .board-box, canvas#board {
         width: 100%;
-      }
-      .laser-line {
-        width: 3px;
-        height: 100%;
-        margin: 0 auto;
+        max-width: 360px;
       }
     }
   </style>
 </head>
 <body>
-
-  <div class="main-wrap">
-    <!-- Compact Header with Inline Scoreboard HUD -->
-    <div class="header-bar">
-      <div class="header-left">
-        <div class="header-title">
-          djev <span class="slash">//</span> snake
-        </div>
-        <div class="status-chip">
-          <span id="dot" class="led"></span>
-          <span id="status-text">IDLE · READY</span>
-        </div>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="top-left">
+        <span class="title">djev / snake</span>
+        <span class="status">
+          <span id="dot" class="dot"></span>
+          <span id="status-text">Idle</span>
+        </span>
       </div>
 
-      <div class="hud-strip">
-        <div class="hud-stat">
-          <span class="hud-key">SCORE</span>
-          <span id="m-score" class="hud-val green">0</span>
-        </div>
-        <div class="hud-stat">
-          <span class="hud-key">LEN</span>
-          <span id="m-len" class="hud-val cyan">4</span>
-        </div>
-        <div class="hud-stat">
-          <span class="hud-key">STEP</span>
-          <span id="m-steps" class="hud-val">0</span>
-        </div>
-        <div class="hud-stat">
-          <span class="hud-key">LATENCY</span>
-          <span id="m-ms" class="hud-val orange">-- ms</span>
-        </div>
-        <button class="btn-mini" id="btn-config" type="button">[Endpoint]</button>
-        <button class="btn-mini" id="btn-theme" type="button">[Theme]</button>
+      <div class="metrics">
+        <span class="metric">
+          <span class="metric-label">Score</span>
+          <span id="m-score" class="metric-val">0</span>
+        </span>
+        <span class="metric">
+          <span class="metric-label">Step</span>
+          <span id="m-steps" class="metric-val">0</span>
+        </span>
+        <span class="metric">
+          <span class="metric-label">Latency</span>
+          <span id="m-ms" class="metric-val">0 ms</span>
+        </span>
+      </div>
+
+      <div class="top-actions">
+        <button id="btn-start" type="button">Start</button>
+        <button id="btn-reset" type="button">Reset</button>
       </div>
     </div>
 
-    <!-- Optional Endpoint Bar (toggled via [Endpoint]) -->
-    <div id="config-drawer" class="endpoint-bar" hidden>
-      <label>
-        POST Endpoint
-        <input id="endpoint" class="inline-input" style="width: 310px" spellcheck="false">
-      </label>
-      <label>
-        Bearer Token
-        <input id="token" type="password" class="inline-input" style="width: 150px" placeholder="optional API_KEY">
-      </label>
-    </div>
-
-    <!-- 2-Stage Arena Grid -->
-    <div class="stage-grid">
-
-      <!-- STAGE 01: SNAKE ARENA -->
-      <div class="cyber-card node-arena">
-        <div>
-          <div class="card-top">
-            <span class="card-title">01 // SNAKE ARENA (12x12)</span>
-            <span class="card-meta" id="coords-text">head [5,6] · food [9,3]</span>
-          </div>
-
-          <div class="canvas-box">
-            <canvas id="board"></canvas>
-          </div>
-        </div>
-
-        <div class="action-row">
-          <button class="btn-fire" id="btn-start" type="button">▶ START AUTOPILOT</button>
-          <button class="btn-sec" id="btn-step" type="button">Step ↵</button>
-          <button class="btn-sec mask-on" id="btn-mask" type="button" title="Restrict argmax choice to safe_moves">Mask: ON</button>
-          <button class="btn-sec" id="btn-reset" type="button" title="Reset board (R)">↺</button>
-        </div>
+    <div class="main-grid">
+      <div class="board-box">
+        <canvas id="board"></canvas>
       </div>
 
-      <!-- LASER CONDUIT -->
-      <div class="laser-pipe" id="pipe">
-        <div class="laser-line">
-          <div class="laser-bolt"></div>
+      <div class="right-col">
+        <div class="panel probs-panel">
+          <div class="panel-head">
+            <span>Move Probabilities</span>
+            <span id="choice-badge" class="panel-sub">choice: right (50.0%)</span>
+          </div>
+          <div class="prob-rows">
+            <div class="prob-row">
+              <span class="dir-name" id="name-up">↑ up</span>
+              <div class="bar-track"><div class="bar-fill" id="bar-up"></div></div>
+              <span class="prob-pct dim" id="val-up">25.0%</span>
+              <span class="safety-tag" id="safe-up">safe</span>
+            </div>
+            <div class="prob-row">
+              <span class="dir-name" id="name-down">↓ down</span>
+              <div class="bar-track"><div class="bar-fill" id="bar-down"></div></div>
+              <span class="prob-pct dim" id="val-down">25.0%</span>
+              <span class="safety-tag" id="safe-down">safe</span>
+            </div>
+            <div class="prob-row">
+              <span class="dir-name" id="name-left">← left</span>
+              <div class="bar-track"><div class="bar-fill" id="bar-left"></div></div>
+              <span class="prob-pct dim" id="val-left">0.0%</span>
+              <span class="safety-tag blocked" id="safe-left">neck</span>
+            </div>
+            <div class="prob-row">
+              <span class="dir-name chosen" id="name-right">→ right</span>
+              <div class="bar-track"><div class="bar-fill chosen" id="bar-right"></div></div>
+              <span class="prob-pct" id="val-right">50.0%</span>
+              <span class="safety-tag" id="safe-right">safe</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel json-panel">
+          <div class="panel-head">
+            <span>Last /v1/systemone Call</span>
+            <span id="coords-text" class="panel-sub">head [5,6] · food [9,3]</span>
+          </div>
+          <pre id="live-json"></pre>
         </div>
       </div>
-
-      <!-- STAGE 02: TYPESAFE-AI / JEV ENGINE -->
-      <div class="cyber-card node-jev" id="node-jev">
-        <div class="card-top">
-          <span class="card-title">02 // typesafe-ai/jev</span>
-          <span class="card-meta" id="engine-tag">POST /v1/systemone · samples=1</span>
-        </div>
-
-        <div class="jev-stack">
-          <!-- Rule / Question Prompt -->
-          <div class="prompt-box">
-            <div class="box-label">
-              <span>QUESTION SCHEMA (move: choice)</span>
-              <span id="rate-tag" style="color: var(--muted)">0.0 ticks/s</span>
-            </div>
-            <div class="prompt-text">"Pick a direction in safe_moves that minimizes manhattan_to_food while keeping open_space open."</div>
-          </div>
-
-          <!-- Live 4-Direction Probability Bars -->
-          <div class="probs-box">
-            <div class="box-label">
-              <span>CALIBRATED SLOT PROBABILITIES</span>
-              <span id="choice-badge" style="color: var(--cyan)">argmax: right (50.0%)</span>
-            </div>
-            <div class="prob-grid">
-              <div class="prob-row">
-                <span class="dir-tag" id="name-up">↑ up</span>
-                <span class="safety-tag safe" id="safe-up">safe d=7</span>
-                <div class="bar-track"><div class="bar-fill" id="bar-up"></div></div>
-                <span class="prob-num dim" id="val-up">25.0%</span>
-              </div>
-              <div class="prob-row">
-                <span class="dir-tag" id="name-down">↓ down</span>
-                <span class="safety-tag safe" id="safe-down">safe d=9</span>
-                <div class="bar-track"><div class="bar-fill" id="bar-down"></div></div>
-                <span class="prob-num dim" id="val-down">25.0%</span>
-              </div>
-              <div class="prob-row">
-                <span class="dir-tag" id="name-left">← left</span>
-                <span class="safety-tag blocked" id="safe-left">neck</span>
-                <div class="bar-track"><div class="bar-fill" id="bar-left"></div></div>
-                <span class="prob-num dim" id="val-left">0.0%</span>
-              </div>
-              <div class="prob-row">
-                <span class="dir-tag chosen" id="name-right">→ right</span>
-                <span class="safety-tag safe" id="safe-right">safe d=6</span>
-                <div class="bar-track"><div class="bar-fill chosen" id="bar-right"></div></div>
-                <span class="prob-num" id="val-right">50.0%</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Syntax-Highlighted Live State & Jev Output Box -->
-          <div class="json-code-box">
-            <div class="box-label">
-              <span>LIVE TELEMETRY PAYLOAD (STATE -> ANSWERS.MOVE)</span>
-              <span id="shield-tag" style="color: var(--green)">shield: 0</span>
-            </div>
-            <pre class="syntax-pre" id="live-json"></pre>
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
 
 <script>
 const GRID = 12;
-const CSS_SIZE = 366;
+const CSS_SIZE = 360;
 const DIRS = ["up", "down", "left", "right"];
 const ARROWS = { up: "↑", down: "↓", left: "←", right: "→" };
 const VEC = {
@@ -719,50 +429,11 @@ const QUESTIONS_SCHEMA = {
 
 const $ = id => document.getElementById(id);
 
-function defaultEndpoint() {
-  try {
-    const saved = localStorage.getItem("djev_snake_endpoint");
-    if (saved) return saved;
-  } catch (e) {}
+function resolveEndpointUrl() {
   if (location.protocol === "http:" || location.protocol === "https:") {
     return "/v1/systemone";
   }
   return "https://djev-dgemma-864751976003.us-central1.run.app/v1/systemone";
-}
-
-$("endpoint").value = defaultEndpoint();
-try {
-  $("token").value = localStorage.getItem("djev_api_key") || "";
-} catch (e) {}
-
-$("endpoint").onchange = () => {
-  try { localStorage.setItem("djev_snake_endpoint", $("endpoint").value.trim()); } catch (e) {}
-};
-$("token").onchange = () => {
-  try { localStorage.setItem("djev_api_key", $("token").value.trim()); } catch (e) {}
-};
-
-$("btn-config").onclick = () => {
-  const dr = $("config-drawer");
-  dr.hidden = !dr.hidden;
-};
-
-$("btn-theme").onclick = () => {
-  const root = document.documentElement;
-  const isLight = root.classList.contains("light");
-  root.classList.toggle("light", !isLight);
-  root.classList.toggle("dark", isLight);
-  drawBoard();
-};
-
-function resolveEndpointUrl() {
-  let u = $("endpoint").value.trim() || "/v1/systemone";
-  if (u.startsWith("http://") || u.startsWith("https://")) {
-    if (!u.endsWith("/v1/systemone") && !u.endsWith("/v1/evaluate")) {
-      u = u.replace(/\/+$/, "") + "/v1/systemone";
-    }
-  }
-  return u;
 }
 
 let snake = [];
@@ -771,26 +442,10 @@ let nextChoice = "right";
 let food = [9, 3];
 let score = 0;
 let steps = 0;
-let shieldCount = 0;
-let maskEnabled = true;
 let alive = true;
 let running = false;
 let inflight = false;
 let sandboxFallback = false;
-let recentTicks = [];
-
-$("btn-mask").onclick = () => {
-  maskEnabled = !maskEnabled;
-  $("btn-mask").textContent = maskEnabled ? "Mask: ON" : "Mask: OFF";
-  $("btn-mask").className = "btn-sec" + (maskEnabled ? " mask-on" : "");
-};
-
-function pulseLaser() {
-  const p = $("pipe");
-  p.classList.remove("pulse");
-  void p.offsetWidth;
-  p.classList.add("pulse");
-}
 
 function spawnFood(body) {
   const occupied = new Set(body.map(([x, y]) => x + "," + y));
@@ -836,7 +491,6 @@ function buildState() {
   const [nxNeck, nyNeck] = snake[1] || [-1, -1];
 
   const safeMoves = [];
-  const blockedMoves = {};
   const moveAnalysis = {};
 
   for (const d of DIRS) {
@@ -854,11 +508,7 @@ function buildState() {
     const isSafe = reason === "safe";
     const dist = Math.abs(fx - tx) + Math.abs(fy - ty);
     const space = isSafe ? floodFillCount(tx, ty, bodyObstacles) : 0;
-    if (isSafe) {
-      safeMoves.push(d);
-    } else {
-      blockedMoves[d] = reason;
-    }
+    if (isSafe) safeMoves.push(d);
     moveAnalysis[d] = {
       safe: isSafe,
       reason,
@@ -880,21 +530,15 @@ function buildState() {
   }
 
   return {
-    board: `${GRID}x${GRID}`,
     head: [hx, hy],
-    direction,
-    length: snake.length,
-    score,
     food: [fx, fy],
     food_delta: {
       dx,
       dy,
-      manhattan: Math.abs(dx) + Math.abs(dy),
       preferred_horizontal: dx > 0 ? "right" : (dx < 0 ? "left" : "aligned"),
       preferred_vertical: dy > 0 ? "down" : (dy < 0 ? "up" : "aligned")
     },
     safe_moves: safeMoves,
-    blocked_moves: blockedMoves,
     move_analysis: moveAnalysis,
     recommended_safe_move: bestMove
   };
@@ -931,7 +575,7 @@ function simulateSystemOne(state) {
     }
   }
   return {
-    model: "dgemma-sim",
+    model: "dgemma",
     answers: {
       move: {
         type: "choice",
@@ -952,79 +596,55 @@ async function requestDecision(state) {
     state,
     questions: QUESTIONS_SCHEMA
   };
-  const headers = { "content-type": "application/json" };
-  const tok = $("token").value.trim();
-  if (tok) headers["authorization"] = "Bearer " + tok;
-
-  pulseLaser();
   const t0 = performance.now();
   try {
     const resp = await fetch(resolveEndpointUrl(), {
       method: "POST",
-      headers,
+      headers: { "content-type": "application/json" },
       body: JSON.stringify(reqBody)
     });
     const ms = Math.round(performance.now() - t0);
     const data = await resp.json();
-    if (!resp.ok) {
-      throw new Error((data.error && data.error.message) || ("HTTP " + resp.status));
-    }
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
     sandboxFallback = false;
     return { data, ms };
   } catch (err) {
-    const ms = Math.max(8, Math.round(performance.now() - t0));
+    const ms = Math.max(11, Math.round(performance.now() - t0));
     sandboxFallback = true;
-    const data = simulateSystemOne(state);
-    return { data, ms };
+    return { data: simulateSystemOne(state), ms };
   }
 }
 
 function setStatus(text, kind) {
   $("status-text").textContent = text;
-  $("dot").className = "led" + (kind ? " " + kind : "");
-  $("node-jev").className = "cyber-card node-jev" + (kind === "live" ? " live-ok" : "");
+  $("dot").className = "dot" + (kind ? " " + kind : "");
 }
 
-function renderSyntaxJson(state, finalChoice, probs) {
-  const safeStr = state.safe_moves.map(m => `<span class="j-str">"${m}"</span>`).join(", ");
-  const pVal = (probs[finalChoice] || 0).toFixed(3);
+function renderJson(state, finalChoice, probs) {
+  const safeList = state.safe_moves.map(m => `<span class="j-str">"${m}"</span>`).join(", ");
+  const conf = (probs[finalChoice] || 0).toFixed(3);
   $("live-json").innerHTML =
-`<span class="j-bracket">{</span>
-  <span class="j-key">"state"</span>: <span class="j-bracket">{</span>
+`{
+  <span class="j-key">"state"</span>: {
     <span class="j-key">"head"</span>: [<span class="j-num">${state.head[0]}</span>, <span class="j-num">${state.head[1]}</span>], <span class="j-key">"food"</span>: [<span class="j-num">${state.food[0]}</span>, <span class="j-num">${state.food[1]}</span>],
-    <span class="j-key">"delta"</span>: <span class="j-bracket">{</span> <span class="j-key">"dx"</span>: <span class="j-num">${state.food_delta.dx}</span>, <span class="j-key">"dy"</span>: <span class="j-num">${state.food_delta.dy}</span>, <span class="j-key">"pref"</span>: <span class="j-str">"${state.food_delta.preferred_horizontal}/${state.food_delta.preferred_vertical}"</span> <span class="j-bracket">}</span>,
-    <span class="j-key">"safe_moves"</span>: [${safeStr}]
-  <span class="j-bracket">}</span>,
-  <span class="j-key">"answers.move"</span>: <span class="j-bracket">{</span> <span class="j-key">"choice"</span>: <span class="j-str">"${finalChoice}"</span>, <span class="j-key">"confidence"</span>: <span class="j-num">${pVal}</span> <span class="j-bracket">}</span>
-<span class="j-bracket">}</span>`;
+    <span class="j-key">"food_delta"</span>: { <span class="j-key">"dx"</span>: <span class="j-num">${state.food_delta.dx}</span>, <span class="j-key">"dy"</span>: <span class="j-num">${state.food_delta.dy}</span> },
+    <span class="j-key">"safe_moves"</span>: [${safeList}]
+  },
+  <span class="j-key">"move"</span>: { <span class="j-key">"choice"</span>: <span class="j-str">"${finalChoice}"</span>, <span class="j-key">"confidence"</span>: <span class="j-num">${conf}</span> }
+}`;
 }
 
-function updateUI(state, probs, rawChoice, finalChoice, ms) {
+function updateUI(state, probs, finalChoice, ms) {
   $("m-score").textContent = String(score);
-  $("m-len").textContent = String(snake.length);
   $("m-steps").textContent = String(steps);
-  $("m-ms").textContent = ms > 0 ? `${ms} ms` : "-- ms";
-  $("shield-tag").textContent = `shield: ${shieldCount}`;
-
-  const now = performance.now();
-  if (ms > 0) {
-    recentTicks.push(now);
-    while (recentTicks.length > 1 && now - recentTicks[0] > 3000) {
-      recentTicks.shift();
-    }
-  }
-  const rate = recentTicks.length > 1
-    ? ((recentTicks.length - 1) * 1000 / (now - recentTicks[0])).toFixed(1)
-    : "0.0";
-  $("rate-tag").textContent = `${rate} ticks/s`;
+  $("m-ms").textContent = `${ms} ms`;
 
   const [hx, hy] = state.head;
   const [fx, fy] = state.food;
   $("coords-text").textContent = `head [${hx},${hy}] · food [${fx},${fy}]`;
 
   const chosenPct = ((probs[finalChoice] || 0) * 100).toFixed(1) + "%";
-  const maskSuffix = rawChoice !== finalChoice ? ` [masked ${rawChoice}]` : "";
-  $("choice-badge").textContent = `argmax: ${finalChoice} (${chosenPct})${maskSuffix}`;
+  $("choice-badge").textContent = `choice: ${finalChoice} (${chosenPct})`;
 
   for (const d of DIRS) {
     const p = Math.max(0, Math.min(1, Number(probs[d] || 0)));
@@ -1032,22 +652,22 @@ function updateUI(state, probs, rawChoice, finalChoice, ms) {
     const info = state.move_analysis[d];
     const isSelected = d === finalChoice;
 
-    $("name-" + d).className = "dir-tag" + (isSelected ? " chosen" : "");
+    $("name-" + d).className = "dir-name" + (isSelected ? " chosen" : "");
     $("name-" + d).textContent = `${ARROWS[d]} ${d}`;
 
     const safeEl = $("safe-" + d);
-    safeEl.textContent = info.safe ? `safe d=${info.manhattan_to_food}` : info.reason;
-    safeEl.className = "safety-tag " + (info.safe ? "safe" : "blocked");
+    safeEl.textContent = info.safe ? "safe" : info.reason;
+    safeEl.className = "safety-tag" + (info.safe ? "" : " blocked");
 
     const barEl = $("bar-" + d);
     barEl.style.width = (p * 100).toFixed(1) + "%";
-    barEl.className = "bar-fill" + (isSelected ? (info.safe ? " chosen" : " danger") : "");
+    barEl.className = "bar-fill" + (isSelected ? " chosen" : "");
 
-    $("val-" + d).className = "prob-num" + (isSelected ? "" : " dim");
+    $("val-" + d).className = "prob-pct" + (isSelected ? "" : " dim");
     $("val-" + d).textContent = pct;
   }
 
-  renderSyntaxJson(state, finalChoice, probs);
+  renderJson(state, finalChoice, probs);
 }
 
 function drawBoard() {
@@ -1065,19 +685,11 @@ function drawBoard() {
   const W = CSS_SIZE;
   const H = CSS_SIZE;
   const cell = W / GRID;
-  const styles = getComputedStyle(document.documentElement);
-  const bg = styles.getPropertyValue("--box-bg").trim() || "#020408";
-  const gridCol = styles.getPropertyValue("--grid-line").trim() || "#0b121e";
-  const dotCol = styles.getPropertyValue("--grid-dot").trim() || "#1e293b";
-  const cyanCol = styles.getPropertyValue("--cyan").trim() || "#00e5ff";
-  const blueCol = styles.getPropertyValue("--blue").trim() || "#38bdf8";
-  const greenCol = styles.getPropertyValue("--green").trim() || "#10b981";
 
-  ctx.fillStyle = bg;
+  ctx.fillStyle = "#f8fafc";
   ctx.fillRect(0, 0, W, H);
 
-  // Subtle grid lines + intersection dots
-  ctx.strokeStyle = gridCol;
+  ctx.strokeStyle = "#e2e8f0";
   ctx.lineWidth = 1;
   for (let i = 1; i < GRID; i++) {
     const p = Math.floor(i * cell) + 0.5;
@@ -1090,61 +702,30 @@ function drawBoard() {
     ctx.lineTo(W, p);
     ctx.stroke();
   }
-  ctx.fillStyle = dotCol;
-  for (let y = 1; y < GRID; y++) {
-    for (let x = 1; x < GRID; x++) {
-      ctx.beginPath();
-      ctx.arc(x * cell, y * cell, 1.0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
 
-  // Chosen vector guide line
-  if (snake.length > 0 && alive && nextChoice) {
-    const [hx, hy] = snake[0];
-    const [vx, vy] = VEC[nextChoice] || [0, 0];
-    ctx.strokeStyle = cyanCol;
-    ctx.globalAlpha = 0.35;
-    ctx.lineWidth = 2;
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    ctx.moveTo((hx + 0.5) * cell, (hy + 0.5) * cell);
-    ctx.lineTo((hx + vx + 0.5) * cell, (hy + vy + 0.5) * cell);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.globalAlpha = 1.0;
-  }
-
-  // Target Apple (Green glowing node)
+  // Target food
   const [fx, fy] = food;
   const fcx = (fx + 0.5) * cell;
   const fcy = (fy + 0.5) * cell;
-  ctx.strokeStyle = greenCol;
-  ctx.globalAlpha = 0.32;
-  ctx.lineWidth = 1.5;
+  ctx.fillStyle = "#16a34a";
   ctx.beginPath();
-  ctx.arc(fcx, fcy, cell * 0.36, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.globalAlpha = 1.0;
-  ctx.fillStyle = greenCol;
-  ctx.beginPath();
-  ctx.arc(fcx, fcy, cell * 0.24, 0, Math.PI * 2);
+  ctx.arc(fcx, fcy, cell * 0.28, 0, Math.PI * 2);
   ctx.fill();
 
-  // Snake Body Segments
+  // Snake segments
   for (let i = snake.length - 1; i >= 0; i--) {
     const [sx, sy] = snake[i];
     const isHead = i === 0;
-    ctx.fillStyle = isHead ? cyanCol : blueCol;
-    ctx.globalAlpha = isHead ? 1.0 : Math.max(0.38, 0.88 - (i / (snake.length + 5)) * 0.45);
-    const pad = isHead ? cell * 0.08 : cell * 0.14;
+    ctx.fillStyle = isHead ? "#0969da" : "#3b82f6";
+    ctx.globalAlpha = isHead ? 1.0 : Math.max(0.45, 0.9 - (i / (snake.length + 5)) * 0.45);
+    const pad = isHead ? cell * 0.09 : cell * 0.14;
     ctx.beginPath();
-    ctx.roundRect(sx * cell + pad, sy * cell + pad, cell - pad * 2, cell - pad * 2, isHead ? 5 : 3);
+    ctx.roundRect(sx * cell + pad, sy * cell + pad, cell - pad * 2, cell - pad * 2, isHead ? 5 : 4);
     ctx.fill();
 
     if (isHead) {
       ctx.globalAlpha = 1.0;
-      ctx.fillStyle = "#020408";
+      ctx.fillStyle = "#ffffff";
       const [vx, vy] = VEC[direction] || [1, 0];
       const hcx = (sx + 0.5) * cell;
       const hcy = (sy + 0.5) * cell;
@@ -1171,9 +752,8 @@ function applyMove(chosenDir) {
   if (nx < 0 || nx >= GRID || ny < 0 || ny >= GRID || bodyObstacles.has(nx + "," + ny)) {
     alive = false;
     running = false;
-    $("btn-start").textContent = "▶ START AUTOPILOT";
-    $("btn-start").classList.remove("active-run");
-    setStatus(`COLLISION (${chosenDir.toUpperCase()})`, "err");
+    $("btn-start").textContent = "Start";
+    setStatus("Collision", "err");
     drawBoard();
     return;
   }
@@ -1191,20 +771,17 @@ function applyMove(chosenDir) {
 
 function resetGame() {
   running = false;
-  $("btn-start").textContent = "▶ START AUTOPILOT";
-  $("btn-start").classList.remove("active-run");
+  $("btn-start").textContent = "Start";
   snake = [[5, 6], [4, 6], [3, 6], [2, 6]];
   direction = "right";
   nextChoice = "right";
   score = 0;
   steps = 0;
-  shieldCount = 0;
-  recentTicks = [];
   alive = true;
   food = spawnFood(snake);
-  setStatus("IDLE · READY", "");
+  setStatus("Idle", "");
   const st = buildState();
-  updateUI(st, { up: 0.25, down: 0.25, left: 0.0, right: 0.50 }, "right", "right", 0);
+  updateUI(st, { up: 0.25, down: 0.25, left: 0.0, right: 0.50 }, "right", 0);
   drawBoard();
 }
 
@@ -1218,23 +795,16 @@ async function stepOnce() {
   const rawChoice = moveAns.choice || DIRS.reduce((a, b) => (probs[a] >= probs[b] ? a : b));
 
   let finalChoice = rawChoice;
-  if (maskEnabled && state.safe_moves.length > 0) {
-    if (!state.safe_moves.includes(rawChoice)) {
-      shieldCount += 1;
-      finalChoice = state.safe_moves.reduce((a, b) => ((probs[a] || 0) >= (probs[b] || 0) ? a : b));
-    }
+  if (state.safe_moves.length > 0 && !state.safe_moves.includes(rawChoice)) {
+    finalChoice = state.safe_moves.reduce((a, b) => ((probs[a] || 0) >= (probs[b] || 0) ? a : b));
   }
   nextChoice = finalChoice;
 
   applyMove(finalChoice);
   if (alive) {
-    if (sandboxFallback) {
-      setStatus(`SIMULATED · ${ms} MS`, "warn");
-    } else {
-      setStatus(`LIVE · ${(data.model || "DGEMMA").toUpperCase()}`, "live");
-    }
+    setStatus(sandboxFallback ? "Running (sim)" : "Running (live)", "live");
   }
-  updateUI(state, probs, rawChoice, finalChoice, ms);
+  updateUI(state, probs, finalChoice, ms);
   drawBoard();
   inflight = false;
 }
@@ -1253,27 +823,17 @@ async function loop() {
 $("btn-start").onclick = () => {
   if (!alive) resetGame();
   running = !running;
-  $("btn-start").textContent = running ? "⏸ PAUSE AUTOPILOT" : "▶ START AUTOPILOT";
-  $("btn-start").classList.toggle("active-run", running);
+  $("btn-start").textContent = running ? "Pause" : "Start";
   if (running) {
     loop();
   } else {
-    setStatus("PAUSED", "");
+    setStatus("Paused", "");
   }
-};
-
-$("btn-step").onclick = async () => {
-  if (!alive) resetGame();
-  running = false;
-  $("btn-start").textContent = "▶ START AUTOPILOT";
-  $("btn-start").classList.remove("active-run");
-  await stepOnce();
 };
 
 $("btn-reset").onclick = () => resetGame();
 
 window.addEventListener("keydown", e => {
-  if (e.target.tagName === "INPUT") return;
   if (e.code === "Space") {
     e.preventDefault();
     $("btn-start").click();
