@@ -109,58 +109,42 @@ gcloud beta run deploy djev-dgemma \
 # --no-cpu-throttling: keeps all 20 vCPUs active during weight loading and vLLM scheduling
 # --network=default --subnet=default --vpc-egress=all-traffic: streams weights from GCS over Google internal networking (~1.05 GiB/s)
 # mount-options=enable-buffered-read=true: prefetches 18 GB safetensors shards sequentially from GCS
-# COPY_TO_SHM=1: copies the 17.53 GiB model into /dev/shm RAM in the background while Python imports torch/vllm so safetensors mmap loads in 5.94s
-# VLLM_WORKER_MULTIPROC_METHOD=fork: forks EngineCore from APIServer with torch/vllm already imported in RAM (saves 20s vs spawn)
-# ENFORCE_EAGER=1 & TORCH_COMPILE_DISABLE=1: skips torch.compile, CUDA graph capture, and redundant startup profiling/autotuning (saves 116s)
-# DISABLE_MM=1: passes --language-model-only --skip-mm-profiling to skip 51s of SigLIP vision/video encoder profiling
+# COPY_TO_SHM=1: stages the 17.5 GB model into /dev/shm RAM in the background while Python imports torch/vllm
+# VLLM_WORKER_MULTIPROC_METHOD=fork: forks EngineCore from APIServer without re-importing Python
+# ENFORCE_EAGER=1 & TORCH_COMPILE_DISABLE=1: skips torch.compile, CUDA graph capture, and redundant startup profiling
+# DISABLE_MM=1: skips SigLIP vision/video encoder profiling for text-only evaluation
 ```
 
-### Run the Sample Code
+### Run the Sample Code & Snake Demo
 
 ```bash
 npm install
 DJEV_BASE_URL="https://<your-cloud-run-url>/v1" TYPESAFE_AI_API_KEY="$(gcloud auth print-identity-token)" npm start
 ```
 
-Open `snake.html` in a browser (or visit `https://<your-cloud-run-url>/`) and
-paste your Cloud Run URL to run the live 1-step diffusion Snake demo.
+Once deployed, open `https://<your-cloud-run-url>/snake` (or `snake.html`
+locally) to play a live Snake game driven by `/v1/systemone` at ~15 moves/sec.
 
 --------------------------------------------------------------------------------
 
 ## Performance
 
--   **Warm single-step evaluation (`c=1, steps=1, samples=1`)**: **62-64 ms**
-    server inference (`63.0 ms` mean, `62.5 ms` median; **163 ms** for
-    `samples="auto"` with 4 parallel samples).
--   **Concurrent batch (`c=32, steps=1, samples=1`)**: **79-123 RPS** (`0.68s` -
-    `0.81s` for 64 requests across 32 workers; **157-181 ms** per 32-request
-    batch).
--   **Cold start (`53.5s` (`0m 53s`) vs. `4m 05s` (`245s`) baseline — 4.6x
-    faster)**:
-    -   **Parallel GCS to `/dev/shm` staging (`COPY_TO_SHM=1`, saves `16.6s` on
-        critical path)**: Copies `config.json` and tokenizer files first
-        (`0.05s`) and streams the 17.53 GiB `safetensors` shards into `/dev/shm`
-        (`1.05 GiB/s`, finishes at `t=20.0s`) in the background while Python
-        imports `torch` and `vllm`, followed by a `5.94s` `safetensors` mmap
-        load from RAM into VRAM (`t=47.9s`).
-    -   **`VLLM_WORKER_MULTIPROC_METHOD=fork` (saves `20.0s`)**: Forks
-        `EngineCore` from `APIServer` after `torch`, `vllm`, `transformers`, and
-        `flashinfer` are already imported in memory instead of spawning a second
-        Python interpreter from scratch.
-    -   **`DISABLE_MM=1` (saves `51.0s`)**: Skips SigLIP vision/video encoder
-        profiling (`--language-model-only --skip-mm-profiling`).
-    -   **`ENFORCE_EAGER=1` + `TORCH_COMPILE_DISABLE=1` + skipping redundant
-        `profile_run()` / `kernel_warmup` (saves `104s`, cutting `init engine`
-        from `73.1s` to `1.98s`)**: Because `--kv-cache-memory` (`2 GiB`) and
-        `--enforce-eager` are explicitly configured for 1-step block diffusion
-        (`steps=1`), skipping `torch.compile`, CUDA graph capture, dummy
-        4096-token memory-profiling runs, and 21-bucket FlashInfer startup
-        autotuning brings `init engine` down to `1.98s` and total container
-        startup to **`53.5s`**.
+-   **Cold start from zero instances**: **~53s** (down from `4m 05s` baseline)
+-   **Single-request latency**: **~35-60 ms** (`steps=1, samples=1`; **~160 ms**
+    with `samples="auto"`)
+-   **Batch throughput**: **~100-123 requests/sec** at `concurrency=32`
+
+To reach a 53-second cold start on Cloud Run, the container streams the 17.5 GB
+`safetensors` weights from GCS into `/dev/shm` RAM in the background (`1.05
+GiB/s`) while Python imports `torch` and `vllm`, forks `EngineCore` from
+`APIServer` (`VLLM_WORKER_MULTIPROC_METHOD=fork`) so modules are not imported
+twice, disables unused SigLIP vision profiling (`DISABLE_MM=1`), and skips
+`torch.compile`, CUDA graph capture, and redundant memory-profiling passes
+(`ENFORCE_EAGER=1`, `TORCH_COMPILE_DISABLE=1`, `--kv-cache-memory`).
 
 --------------------------------------------------------------------------------
 
 ## Pricing
 
 1 NVIDIA RTX PRO 6000 GPU (20 vCPU, 80 GiB RAM) costs $3.19 per hour while
-active.
+active and scales to $0 when idle with `--min-instances=0`.
