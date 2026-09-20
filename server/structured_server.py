@@ -93,8 +93,6 @@ PAGES = {  # served with TEST_PAGE=1
     "/": "playground.html",
     "/playground": "playground.html",
     "/playground.html": "playground.html",
-    "/walk": "walk.html",
-    "/cube": "cube.html",
 }
 CANVAS_LEN = 64  # the served canvas length. A request may be narrower.
 CANVAS_STEP = 16  # request widths are multiples of this
@@ -1164,86 +1162,6 @@ def jev_schema(body):
   return parse_schema(schema)
 
 
-def openai_schema_from_json_schema(js_schema, instructions=None, body=None):
-  """Translate an OpenAI / Vercel AI SDK JSON Schema into a djev schema."""
-  if not isinstance(js_schema, dict):
-    raise SchemaError("json_schema: schema must be an object")
-  props = js_schema.get("properties") or {}
-  if not isinstance(props, dict) or not props:
-    raise SchemaError("json_schema: properties must be a non-empty object")
-  qs = []
-  text_fields = []
-  for qid, prop in props.items():
-    if not isinstance(prop, dict):
-      continue
-    ptype = prop.get("type")
-    if isinstance(ptype, list):
-      ptype = next(
-          (t for t in ptype if t != "null"), ptype[0] if ptype else "string"
-      )
-    desc = str(prop.get("description") or f"Evaluate {qid}").strip()
-    if ptype == "boolean":
-      qs.append({
-          "id": qid,
-          "type": "noul",
-          "orig_type": "boolean",
-          "instructions": desc,
-      })
-    elif (
-        ptype == "string"
-        and isinstance(prop.get("enum"), list)
-        and len(prop["enum"]) >= 2
-    ):
-      qs.append({
-          "id": qid,
-          "type": "choice",
-          "orig_type": "choice",
-          "instructions": desc,
-          "options": [
-              {"name": str(v), "description": None} for v in prop["enum"][:26]
-          ],
-      })
-    elif ptype in ("integer", "number"):
-      if isinstance(prop.get("enum"), list) and len(prop["enum"]) >= 2:
-        levels = [str(v) for v in prop["enum"][:26]]
-      else:
-        lo = int(prop.get("minimum", 1))
-        hi = int(prop.get("maximum", 5))
-        if hi <= lo:
-          lo, hi = 1, 5
-        if hi - lo + 1 <= 10:
-          levels = [str(v) for v in range(lo, hi + 1)]
-        else:
-          levels = [str(round(lo + i * (hi - lo) / 4)) for i in range(5)]
-      qs.append({
-          "id": qid,
-          "type": "score",
-          "orig_type": ptype,
-          "instructions": desc,
-          "levels": levels,
-      })
-    elif ptype == "string":
-      text_fields.append(qid)
-  if not qs:
-    qs.append({
-        "id": "_eval_pass",
-        "type": "noul",
-        "orig_type": "boolean",
-        "instructions": (
-            instructions or "Does the input satisfy the evaluation criteria?"
-        ),
-    })
-  raw = {k: (body or {})[k] for k in JEV_EXTENSIONS if body and k in body}
-  if instructions:
-    raw["instructions"] = instructions
-  if "samples" not in raw:
-    raw["samples"] = 1
-  raw["questions"] = qs
-  parsed = parse_schema(raw)
-  parsed["text_fields"] = text_fields
-  return parsed
-
-
 def image_part(content_type, data):
   return {
       "type": "image_url",
@@ -1568,10 +1486,6 @@ class Handler(BaseHTTPRequestHandler):
 
   def _chat(self, req):
     msgs = req.get("messages") or []
-    rf = req.get("response_format") or {}
-    tools = req.get("tools") or []
-    if rf.get("type") in ("json_schema", "json_object") or tools:
-      return self._chat_json_schema(req, msgs, rf, tools)
     if (
         len(msgs) != 2
         or msgs[0].get("role") not in ("system", "developer")
@@ -1653,118 +1567,6 @@ class Handler(BaseHTTPRequestHandler):
                 "prompt_tokens": 0,
                 "completion_tokens": completion_tokens,
                 "total_tokens": completion_tokens,
-            },
-        },
-    )
-
-  def _chat_json_schema(self, req, msgs, rf, tools):
-    """OpenAI and Vercel AI SDK structured output and evaluation handler."""
-    tool_name = None
-    if tools and isinstance(tools[0], dict):
-      fn = tools[0].get("function") or {}
-      tool_name = fn.get("name", "json_output")
-      js_schema = fn.get("parameters") or {}
-    else:
-      js_spec = rf.get("json_schema") or {}
-      js_schema = js_spec.get("schema") or rf.get("schema") or {}
-    sys_parts = [
-        message_text(m)
-        for m in msgs
-        if m.get("role") in ("system", "developer")
-    ]
-    user_parts = [
-        message_text(m)
-        for m in msgs
-        if m.get("role") not in ("system", "developer")
-    ]
-    instructions = "\n".join(p for p in sys_parts if p).strip() or None
-    state = "\n\n".join(p for p in user_parts if p).strip() or "{}"
-    try:
-      schema = openai_schema_from_json_schema(js_schema, instructions, req)
-    except SchemaError as e:
-      return self._json(
-          400, {"error": {"message": str(e), "type": "invalid_request_error"}}
-      )
-    code, result = self._decide(schema, state, int(req.get("seed", 42)))
-    if code != 200:
-      if code == 422:
-        result["error"]["type"] = "invalid_request_error"
-        code = 400
-      return self._json(code, result)
-    body, completion_tokens = result
-    obj: dict[str, typing.Any] = {}
-    jev_ans: dict[str, typing.Any] = {}
-    conf_map: dict[str, typing.Any] = {}
-    for q in schema["questions"]:
-      qid = q["id"]
-      a = body["answers"].get(qid)
-      jev_ans[qid] = jev_answer(q, a)
-      conf_map[qid] = a["confidence"] if a else None
-      if qid == "_eval_pass":
-        continue
-      if a is None:
-        obj[qid] = None
-      elif q.get("orig_type") == "boolean":
-        obj[qid] = bool(a["noul"] >= 0.5)
-      elif q.get("orig_type") == "choice":
-        obj[qid] = a["choice"]
-      else:
-        expected = sum(
-            float(c[0]) * a["probabilities"][c[0]] for c in q["choices"]
-        )
-        obj[qid] = (
-            int(round(expected))
-            if q.get("orig_type") == "integer"
-            else round(expected, 4)
-        )
-    summary_text = "Calibrated 1-step diffusion evaluation: " + ", ".join(
-        f"{k}={v['label']} (p={v['confidence']:.3f})"
-        for k, v in body["answers"].items()
-        if v
-    )
-    for tf in schema.get("text_fields") or []:
-      obj[tf] = summary_text
-    djev_meta = {
-        "answers": jev_ans,
-        "raw_answers": body["answers"],
-        "diagnostics": body["diagnostics"],
-    }
-    provider_metadata = {
-        "typesafe": {
-            "confidence": conf_map,
-            "answers": jev_ans,
-        }
-    }
-    prompt_tokens = body["diagnostics"].get("prompt_tokens") or 0
-    msg_out: dict[str, typing.Any] = {
-        "role": "assistant",
-        "content": json.dumps(obj),
-        "djev": djev_meta,
-    }
-    if tool_name:
-      msg_out["tool_calls"] = [{
-          "id": "call_djev_0",
-          "type": "function",
-          "function": {"name": tool_name, "arguments": json.dumps(obj)},
-      }]
-    self._json(
-        200,
-        {
-            "id": f"chatcmpl-{int(time.time() * 1000)}",
-            "object": "chat.completion",
-            "created": int(time.time()),
-            "model": req.get("model", getattr(ARGS, "model", "dgemma")),
-            "choices": [{
-                "index": 0,
-                "message": msg_out,
-                "finish_reason": "tool_calls" if tool_name else "stop",
-            }],
-            "djev": djev_meta,
-            "providerMetadata": provider_metadata,
-            "usage": {
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "total_tokens": prompt_tokens + completion_tokens,
             },
         },
     )

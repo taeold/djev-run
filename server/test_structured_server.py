@@ -735,11 +735,7 @@ assert (
     and get("/playground.html")[0] == 200
     and get("/other")[0] == 404
 )
-code, page = get("/walk")
-assert code == 200 and b"all clear ahead" in page and b"facingMode" in page
-assert get("/cube")[0] == 200 and b"Cube Rule Live" in get("/cube")[1]
 S.TEST_PAGE = False
-assert get("/walk")[0] == 404 and get("/cube")[0] == 404
 print("playground ok")
 
 
@@ -1082,70 +1078,5 @@ assert (
     < 1e-6
 )
 print("/v1/evaluate ok")
-
-# POST /v1/chat/completions with OpenAI / Vercel AI SDK response_format: json_schema
-SEEN.clear()
-code, chat_js = post({
-    "model": "dgemma",
-    "messages": [
-        {
-            "role": "system",
-            "content": (
-                "Evaluate the assistant response for faithfulness and tone."
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                "User: How do I reset my password? Assistant: Go to Settings >"
-                " Security."
-            ),
-        },
-    ],
-    "response_format": {
-        "type": "json_schema",
-        "json_schema": {
-            "name": "evaluation_result",
-            "strict": True,
-            "schema": {
-                "type": "object",
-                "properties": {
-                    "faithful": {
-                        "type": "boolean",
-                        "description": "Is the answer grounded and accurate?",
-                    },
-                    "category": {
-                        "type": "string",
-                        "enum": ["billing", "security", "feature"],
-                        "description": "Primary support domain",
-                    },
-                    "score": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 3,
-                        "description": "Quality score from 1 to 3",
-                    },
-                    "reason": {
-                        "type": "string",
-                        "description": "Calibrated summary",
-                    },
-                },
-                "required": ["faithful", "category", "score", "reason"],
-            },
-        },
-    },
-})
-assert code == 200, chat_js
-parsed_obj = json.loads(chat_js["choices"][0]["message"]["content"])
-assert parsed_obj["faithful"] is True, parsed_obj
-assert parsed_obj["category"] == "billing", parsed_obj
-assert parsed_obj["score"] in (1, 2, 3), parsed_obj
-assert "Calibrated 1-step diffusion evaluation" in parsed_obj["reason"]
-assert (
-    abs(chat_js["providerMetadata"]["typesafe"]["confidence"]["faithful"] - 0.7)
-    < 1e-6
-)
-assert "answers" in chat_js["djev"] and "diagnostics" in chat_js["djev"]
-print("/v1/chat/completions json_schema ok")
 
 print("ALL OK")

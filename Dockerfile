@@ -36,7 +36,7 @@ RUN mkdir -p /models/dgemma && \
       curl -sfL "https://huggingface.co/nvidia/diffusiongemma-26B-A4B-it-NVFP4/resolve/main/${f}" -o "/models/dgemma/${f}"; \
     done
 
-COPY server/structured_server.py server/playground.html server/walk.html server/cube.html server/test_structured_server.py /opt/dgemma/
+COPY server/structured_server.py server/playground.html server/test_structured_server.py /opt/dgemma/
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && \
     python3 -m py_compile /opt/dgemma/structured_server.py && \

@@ -94,40 +94,7 @@ if [ ! -f "$JIT_CACHE_ARCHIVE" ] && [ -d "/mnt/gcs" ]; then
   echo "[init] Saved JIT cache to $JIT_CACHE_ARCHIVE"
 fi
 
-# 6. If running inside a Cloud Run Job (CLOUD_RUN_TASK_COUNT is set), run batch evaluation and exit cleanly
-if [ -n "${CLOUD_RUN_TASK_COUNT:-}" ]; then
-  echo "[job] Detected Cloud Run Job shard ${CLOUD_RUN_TASK_INDEX:-0}/${CLOUD_RUN_TASK_COUNT}. Starting local proxy on 127.0.0.1:${PORT}..."
-  python3 /opt/dgemma/structured_server.py \
-    --upstream http://127.0.0.1:8000 \
-    --model dgemma \
-    --tokenizer "$MODEL" \
-    --canvas "$CANVAS" \
-    --host 127.0.0.1 \
-    --port "$PORT" &
-  PROXY_PID=$!
-  for k in $(seq 1 30); do
-    if curl -sf "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
-      break
-    fi
-    sleep 1
-  done
-  if [ -n "${BATCH_CMD:-}" ]; then
-    echo "[job] Running BATCH_CMD for shard ${CLOUD_RUN_TASK_INDEX:-0}/${CLOUD_RUN_TASK_COUNT}..."
-    eval "$BATCH_CMD"
-  else
-    echo "[job] Running default verification /v1/evaluate call for shard ${CLOUD_RUN_TASK_INDEX:-0}/${CLOUD_RUN_TASK_COUNT}..."
-    curl -sf "http://127.0.0.1:${PORT}/v1/evaluate" \
-      -H "Content-Type: application/json" \
-      -d "{\"model\":\"jev-latest\",\"samples\":1,\"state\":{\"shard\":\"${CLOUD_RUN_TASK_INDEX:-0}/${CLOUD_RUN_TASK_COUNT}\"},\"questions\":{\"ok\":{\"type\":\"boolean\",\"instructions\":\"Is this shard operational?\"}}}"
-    echo ""
-  fi
-  kill "$PROXY_PID" "$VLLM_PID" 2>/dev/null || true
-  wait "$PROXY_PID" "$VLLM_PID" 2>/dev/null || true
-  echo "[job] Shard ${CLOUD_RUN_TASK_INDEX:-0}/${CLOUD_RUN_TASK_COUNT} completed cleanly."
-  exit 0
-fi
-
-# 7. Launch structured_server.py on 0.0.0.0:$PORT (Cloud Run Service ingress port)
+# 6. Launch structured_server.py on 0.0.0.0:$PORT (Cloud Run Service ingress port)
 echo "[init] Starting structured_server.py on 0.0.0.0:${PORT}..."
 export TEST_PAGE="${TEST_PAGE:-1}"
 exec python3 /opt/dgemma/structured_server.py \
@@ -137,3 +104,4 @@ exec python3 /opt/dgemma/structured_server.py \
   --canvas "$CANVAS" \
   --host 0.0.0.0 \
   --port "$PORT"
+
