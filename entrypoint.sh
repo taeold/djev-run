@@ -4,6 +4,7 @@ set -euo pipefail
 MODEL="${MODEL:-/mnt/gcs/dgemma}"
 CANVAS="${CANVAS:-128}"
 PORT="${PORT:-8080}"
+ENFORCE_EAGER="${ENFORCE_EAGER:-0}"
 JIT_CACHE_ARCHIVE="/mnt/gcs/jit-cache/rtx-pro-6000-cache.tar.gz"
 
 mkdir -p /root/.cache/flashinfer /root/.triton /root/.cache/vllm
@@ -24,6 +25,12 @@ if [ "${COPY_TO_SHM:-1}" = "1" ] && [ -d "/mnt/gcs/dgemma" ] && [ -f "/mnt/gcs/d
 fi
 
 # 3. Start internal vLLM server on 127.0.0.1:8000
+VLLM_EXTRA_ARGS=()
+if [ "$ENFORCE_EAGER" = "1" ]; then
+  echo "[init] ENFORCE_EAGER=1 enabled: passing --enforce-eager to vLLM..."
+  VLLM_EXTRA_ARGS+=(--enforce-eager)
+fi
+
 echo "[init] Starting vLLM serve for $MODEL..."
 vllm serve "$MODEL" \
   --host 127.0.0.1 \
@@ -39,7 +46,8 @@ vllm serve "$MODEL" \
   --enable-prefix-caching \
   --diffusion-config "{\"canvas_length\": ${CANVAS}}" \
   --override-generation-config '{"max_new_tokens": null}' \
-  --async-scheduling &
+  --async-scheduling \
+  "${VLLM_EXTRA_ARGS[@]}" &
 VLLM_PID=$!
 
 # 4. Poll vLLM health endpoint before launching structured_server.py

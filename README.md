@@ -110,6 +110,19 @@ gcloud beta run deploy djev-dgemma \
 
 --------------------------------------------------------------------------------
 
+## Performance
+
+-   **Single-step evaluation (`steps=1`)**: ~30-45 ms on a warm container.
+-   **Default cold start (~4 minutes)**: vLLM spends ~220 seconds in
+    `torch.compile` and capturing 35 CUDA graphs across batch sizes before
+    opening port 8080.
+-   **Fast cold start (`ENFORCE_EAGER=1`)**: Adding `ENFORCE_EAGER=1` to
+    `--set-env-vars` passes `--enforce-eager` to `vllm serve`, skipping
+    `torch.compile` and CUDA graph capture. This cuts cold start to **~45
+    seconds** while only adding ~3-5 ms to single-step latency.
+
+--------------------------------------------------------------------------------
+
 ## Pricing
 
 1 NVIDIA RTX PRO 6000 GPU (20 vCPU, 80 GiB RAM) costs $3.19 per hour while
