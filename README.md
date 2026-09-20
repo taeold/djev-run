@@ -2,8 +2,10 @@
 
 Serve DiffusionGemma-Jev (`djev`) on a TypeSafe AI compatible API on Cloud Run
 with an NVIDIA RTX PRO 6000 Blackwell GPU. Built on
-[Matt Mastracci (@mmastrac)'s `djev-spark`](https://github.com/mmastrac/djev-spark)
-([announcement](https://x.com/mmastrac/status/2100373761195401724)).
+[`mmastrac/djev-spark`](https://github.com/mmastrac/djev-spark)
+([`@mmastrac`](https://x.com/mmastrac/status/2100373761195401724)) with the
+Snake demo inspired by
+[`mizorewww/laya-coreml`](https://github.com/mizorewww/laya-coreml).
 
 <img width="640" height="360" alt="djev snake" src="https://github.com/user-attachments/assets/588802b2-9f7c-4956-8ecc-cfea0cc4d9ba" />
 
