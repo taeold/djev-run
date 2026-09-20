@@ -7,8 +7,6 @@ with an NVIDIA RTX PRO 6000 Blackwell GPU. Built on
 Snake demo inspired by
 [`mizorewww/laya-coreml`](https://github.com/mizorewww/laya-coreml).
 
-<img width="640" height="360" alt="djev snake" src="https://github.com/user-attachments/assets/588802b2-9f7c-4956-8ecc-cfea0cc4d9ba" />
-
 ```typescript
 import { createTypeSafeAi } from '@ai-sdk/typesafe-ai';
 import { experimental_evaluate, type Experimental_EvaluationModel } from 'ai';
