@@ -68,7 +68,7 @@ gcloud storage cp -r /tmp/dgemma/* "gs://${BUCKET}/dgemma/"
 gcloud beta run deploy djev-dgemma \
   --region="${REGION}" \
   --image=ghcr.io/taeold/djev-run:latest \
-  --gpu=1 \      # or --gpu=0.5 (requires gcloud alpha, --cpu=10, --memory=40Gi)
+  --gpu=1 \
   --gpu-type=nvidia-rtx-pro-6000 \
   --no-gpu-zonal-redundancy \
   --cpu=20 \
@@ -101,7 +101,4 @@ docker push ghcr.io/taeold/djev-run:latest
 
 ## Pricing
 
-Configuration                           | Hourly Rate
-:-------------------------------------- | :-----------
-Full GPU (`--gpu=1`, 20 vCPU, 80 GiB)   | `$3.19 / hr`
-Half GPU (`--gpu=0.5`, 10 vCPU, 40 GiB) | `$1.68 / hr`
+`1x NVIDIA RTX PRO 6000 (20 vCPU, 80 GiB RAM)` costs `$3.19 / hr` while active.
