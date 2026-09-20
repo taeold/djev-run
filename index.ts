@@ -1,8 +1,11 @@
 import {createTypeSafeAi} from '@ai-sdk/typesafe-ai';
 import {experimental_evaluate, type Experimental_EvaluationModel} from 'ai';
 
+const CLOUD_RUN_URL =
+  process.env.CLOUD_RUN_URL || 'https://<your-cloud-run-url>';
+
 const typeSafeAi = createTypeSafeAi({
-  baseURL: process.env.DJEV_BASE_URL ?? 'https://<your-cloud-run-url>/v1',
+  baseURL: process.env.DJEV_BASE_URL ?? `${CLOUD_RUN_URL}/v1`,
 });
 
 async function triage(model: Experimental_EvaluationModel, message: string) {

@@ -403,6 +403,7 @@
   </div>
 
 <script>
+const CLOUD_RUN_URL = "https://<your-cloud-run-url>"; // Replace with your Cloud Run service URL (or leave as-is when opened at /snake on Cloud Run)
 const GRID = 12;
 const CSS_SIZE = 360;
 const DIRS = ["up", "down", "left", "right"];
@@ -430,10 +431,10 @@ const QUESTIONS_SCHEMA = {
 const $ = id => document.getElementById(id);
 
 function resolveEndpointUrl() {
-  if (location.protocol === "http:" || location.protocol === "https:") {
+  if (location.protocol.startsWith("http") && !location.hostname.includes("artifax")) {
     return "/v1/systemone";
   }
-  return "https://djev-dgemma-864751976003.us-central1.run.app/v1/systemone";
+  return `${CLOUD_RUN_URL.replace(/\/+$/, "")}/v1/systemone`;
 }
 
 let snake = [];
