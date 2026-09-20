@@ -5,6 +5,8 @@ MODEL="${MODEL:-/mnt/gcs/dgemma}"
 CANVAS="${CANVAS:-128}"
 PORT="${PORT:-8080}"
 ENFORCE_EAGER="${ENFORCE_EAGER:-1}"
+DISABLE_MM="${DISABLE_MM:-1}"
+EXTRA_ARGS="${EXTRA_ARGS:-}"
 JIT_CACHE_ARCHIVE="/mnt/gcs/jit-cache/rtx-pro-6000-cache.tar.gz"
 
 mkdir -p /root/.cache/flashinfer /root/.triton /root/.cache/vllm
@@ -29,6 +31,14 @@ VLLM_EXTRA_ARGS=()
 if [ "$ENFORCE_EAGER" = "1" ]; then
   echo "[init] ENFORCE_EAGER=1 enabled: passing --enforce-eager to vLLM..."
   VLLM_EXTRA_ARGS+=(--enforce-eager)
+fi
+if [ "$DISABLE_MM" = "1" ]; then
+  echo "[init] DISABLE_MM=1 enabled: passing --language-model-only --skip-mm-profiling --limit-mm-per-prompt to vLLM..."
+  VLLM_EXTRA_ARGS+=(--language-model-only --skip-mm-profiling --limit-mm-per-prompt '{"image":0,"video":0}')
+fi
+if [ -n "$EXTRA_ARGS" ]; then
+  # shellcheck disable=SC2206
+  VLLM_EXTRA_ARGS+=($EXTRA_ARGS)
 fi
 
 echo "[init] Starting vLLM serve for $MODEL..."
