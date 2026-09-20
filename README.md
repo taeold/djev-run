@@ -42,6 +42,23 @@ const result = await triage(
   typeSafeAi.evaluationModel('jev-latest'),
   'I was charged twice and my account is locked',
 );
+console.log(result);
+// {
+//   department: {
+//     type: 'choice',
+//     choice: 'billing',
+//     probabilities: { billing: 0.9988, support: 0.0012 }
+//   },
+//   severity: {
+//     type: 'score',
+//     score: 1.9995,
+//     probabilities: { '0': 0.0002, '1': 0.0001, '2': 0.9997 }
+//   },
+//   requestsRefund: {
+//     type: 'boolean',
+//     probability: 0.9928
+//   }
+// }
 ```
 
 --------------------------------------------------------------------------------
@@ -87,18 +104,13 @@ gcloud beta run deploy djev-dgemma \
   --set-env-vars="MODEL=/mnt/gcs/dgemma,CANVAS=128,MAX_SEQS=32,MAX_MODEL_LEN=4096,GPU_UTIL=0.40,KV_CACHE_GB=2,ATTN=TRITON_ATTN,COPY_TO_SHM=1,VLLM_UF_EAGER_ALL=1,VLLM_FLASHINFER_MOE_BACKEND=masked_gemm,VLLM_WORKER_MULTIPROC_METHOD=spawn,CUDA_MODULE_LOADING=LAZY"
 ```
 
-`ghcr.io/taeold/djev-run:latest` is pre-built from the `Dockerfile` in this repo
+`ghcr.io/taeold/djev-run:latest` is built from the `Dockerfile` in this repo
 (`vllm/vllm-openai` patched with
-[vLLM PR #57250](https://github.com/vllm-project/vllm/pull/57250)). If you want
-to modify the server and build your own image:
-
-```bash
-docker build -t ghcr.io/taeold/djev-run:latest .
-docker push ghcr.io/taeold/djev-run:latest
-```
+[vLLM PR #57250](https://github.com/vllm-project/vllm/pull/57250)).
 
 --------------------------------------------------------------------------------
 
 ## Pricing
 
-`1x NVIDIA RTX PRO 6000 (20 vCPU, 80 GiB RAM)` costs `$3.19 / hr` while active.
+1 NVIDIA RTX PRO 6000 GPU (20 vCPU, 80 GiB RAM) costs $3.19 per hour while
+active.
