@@ -41,6 +41,15 @@ jobs:
               "\"/\": \"snake.html\",\n    \"/snake\": \"snake.html\",\n    \"/snake.html\": \"snake.html\","
           )
           s = s.replace(
+              "        if self.path == \"/health\":\n            return self._json(200, {\"status\": \"ok\"})",
+              "        if self.path == \"/health\":\n"
+              "            try:\n"
+              "                urllib.request.urlopen(ARGS.upstream + \"/health\", timeout=1)\n"
+              "                return self._json(200, {\"status\": \"ok\"})\n"
+              "            except Exception:\n"
+              "                return self._json(503, {\"status\": \"starting\"})"
+          )
+          s = s.replace(
               "init_tokenizer(AutoTokenizer.from_pretrained(ARGS.tokenizer))",
               "tok = AutoTokenizer.from_pretrained(ARGS.tokenizer)\n"
               "    if tok.chat_template is None and os.path.exists(os.path.join(ARGS.tokenizer, \"chat_template.jinja\")):\n"
@@ -57,7 +66,7 @@ jobs:
           PORT="${PORT:-8080}"
           ENFORCE_EAGER="${ENFORCE_EAGER:-1}"
           DISABLE_MM="${DISABLE_MM:-1}"
-          export VLLM_ENABLE_V1_MULTIPROCESSING="${VLLM_ENABLE_V1_MULTIPROCESSING:-0}"
+          export VLLM_WORKER_MULTIPROC_METHOD="${VLLM_WORKER_MULTIPROC_METHOD:-fork}"
           EXTRA_ARGS="${EXTRA_ARGS:-}"
           JIT_CACHE_ARCHIVE="/mnt/gcs/jit-cache/rtx-pro-6000-cache.tar.gz"
           mkdir -p /root/.cache/flashinfer /root/.triton /root/.cache/vllm
@@ -66,13 +75,19 @@ jobs:
           fi
           if [ "${COPY_TO_SHM:-1}" = "1" ] && [ -d "/mnt/gcs/dgemma" ] && [ -f "/mnt/gcs/dgemma/config.json" ]; then
             mkdir -p /dev/shm/dgemma
-            find /mnt/gcs/dgemma -maxdepth 1 -type f | xargs -P 16 -I {} cp -f {} /dev/shm/dgemma/
+            find /mnt/gcs/dgemma -maxdepth 1 -type f ! -name "*.safetensors" | xargs -I {} cp -f {} /dev/shm/dgemma/
+            (
+              find /mnt/gcs/dgemma -maxdepth 1 -type f -name "*.safetensors" | xargs -P 16 -I {} cp -f {} /dev/shm/dgemma/
+              touch /dev/shm/dgemma/.ready
+              echo "[init] Background safetensors copy to /dev/shm/dgemma complete"
+            ) &
             MODEL="/dev/shm/dgemma"
           fi
+          python3 /opt/dgemma/structured_server.py --upstream http://127.0.0.1:8000 --model dgemma --tokenizer "$MODEL" --canvas "$CANVAS" --host 0.0.0.0 --port "$PORT" &
           VLLM_EXTRA_ARGS=()
           if [ "$ENFORCE_EAGER" = "1" ]; then
             export TORCH_COMPILE_DISABLE="${TORCH_COMPILE_DISABLE:-1}"
-            VLLM_EXTRA_ARGS+=(--enforce-eager)
+            VLLM_EXTRA_ARGS+=(--enforce-eager --kernel-config '{"enable_flashinfer_autotune":false,"enable_cutedsl_warmup":false,"enable_jit_warmup":false}')
           fi
           if [ "$DISABLE_MM" = "1" ]; then
             VLLM_EXTRA_ARGS+=(--language-model-only --skip-mm-profiling --limit-mm-per-prompt '{"image":0,"video":0}')
@@ -80,19 +95,12 @@ jobs:
           if [ -n "$EXTRA_ARGS" ]; then
             VLLM_EXTRA_ARGS+=($EXTRA_ARGS)
           fi
-          vllm serve "$MODEL" --host 127.0.0.1 --port 8000 --served-model-name dgemma --trust-remote-code \
+          exec vllm serve "$MODEL" --host 127.0.0.1 --port 8000 --served-model-name dgemma --trust-remote-code \
             --max-num-seqs "${MAX_SEQS:-32}" --max-model-len "${MAX_MODEL_LEN:-4096}" \
             --attention-backend "${ATTN:-TRITON_ATTN}" --gpu-memory-utilization "${GPU_UTIL:-0.40}" \
             --kv-cache-memory "$(( ${KV_CACHE_GB:-2} * 1073741824 ))" --max-logprobs 32 --enable-prefix-caching \
             --diffusion-config "{\"canvas_length\": ${CANVAS}}" --override-generation-config '{"max_new_tokens": null}' \
-            --async-scheduling "${VLLM_EXTRA_ARGS[@]}" &
-          VLLM_PID=$!
-          for i in $(seq 1 450); do
-            kill -0 "$VLLM_PID" 2>/dev/null || exit 1
-            curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1 && break
-            sleep 1
-          done
-          exec python3 /opt/dgemma/structured_server.py --upstream http://127.0.0.1:8000 --model dgemma --tokenizer "$MODEL" --canvas "$CANVAS" --host 0.0.0.0 --port "$PORT"
+            --async-scheduling "${VLLM_EXTRA_ARGS[@]}"
           EOF
           cat > djev-spark/Dockerfile.cloudrun << 'EOF'
           FROM ghcr.io/taeold/djev-run:latest
@@ -108,6 +116,22 @@ jobs:
               "        if kv_cache_memory_bytes := self.cache_config.kv_cache_memory_bytes:\n"
               "            if not self.model_config.enforce_eager:\n"
               "                self.model_runner.profile_run()"
+          )
+          s = s.replace(
+              "        kernel_warmup(self)\n\n"
+              "        if self.use_v2_model_runner:\n"
+              "            # A workspace resize after capture frees what the graphs point at.\n"
+              "            warmup_kernels(self.model_runner, self.execute_model, self.sample_tokens)",
+              "        if not self.model_config.enforce_eager:\n"
+              "            kernel_warmup(self)\n"
+              "            if self.use_v2_model_runner:\n"
+              "                warmup_kernels(self.model_runner, self.execute_model, self.sample_tokens)"
+          )
+          s = s.replace(
+              "self.model_runner.load_model(load_dummy_weights=load_dummy_weights)",
+              "import os, time\n"
+              "            while os.path.exists(\"/dev/shm/dgemma\") and not os.path.exists(\"/dev/shm/dgemma/.ready\"): time.sleep(0.05)\n"
+              "            self.model_runner.load_model(load_dummy_weights=load_dummy_weights)"
           )
           p.write_text(s)
           '
