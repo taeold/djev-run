@@ -3,196 +3,182 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>djev snake · 1-step diffusion decisions</title>
+<title>djev / snake</title>
+<script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
 <style>
   :root {
-    --canvas: var(--app-background, #ffffff);
+    --bg: var(--app-background, #ffffff);
     --surface: var(--app-card, #f6f8fa);
     --border: var(--app-border, #d0d7de);
-    --border-muted: var(--app-card-border, #e1e4e8);
+    --border-subtle: var(--app-card-border, #e6ebf1);
     --text: var(--app-foreground, #1f2328);
     --muted: var(--app-muted-foreground, #656d76);
     --accent: var(--app-primary, #0969da);
-    --accent-subtle: rgba(9, 105, 218, 0.10);
+    --accent-dim: rgba(9, 105, 218, 0.12);
     --ok: var(--success, #1a7f37);
-    --ok-subtle: rgba(26, 127, 55, 0.12);
     --warn: var(--warning, #9a6700);
-    --warn-subtle: rgba(154, 103, 0, 0.12);
     --danger: var(--danger, #cf222e);
-    --danger-subtle: rgba(207, 34, 46, 0.12);
-    --grid-bg: #f6f8fa;
-    --grid-line: #e6ebf1;
+    --board-bg: #fafbfc;
+    --board-dot: #d8dee4;
+    --board-grid: #eff2f5;
     --snake-head: #0969da;
     --snake-body: #218bff;
-    --snake-tail: #79c0ff;
-    --food-fill: #1a7f37;
+    --bar-idle: #afb8c1;
+    --track-bg: #eaeef2;
     --font-ui: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif);
     --font-mono: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace);
   }
   @media (prefers-color-scheme: dark) {
-    :root {
-      --canvas: var(--app-background, #0d1117);
+    :root:not(.light) {
+      --bg: var(--app-background, #0d1117);
       --surface: var(--app-card, #161b22);
       --border: var(--app-border, #30363d);
-      --border-muted: var(--app-card-border, #21262d);
+      --border-subtle: var(--app-card-border, #21262d);
       --text: var(--app-foreground, #e6edf3);
       --muted: var(--app-muted-foreground, #7d8590);
       --accent: var(--app-primary, #2f81f7);
-      --accent-subtle: rgba(47, 129, 247, 0.15);
+      --accent-dim: rgba(47, 129, 247, 0.16);
       --ok: var(--success, #3fb950);
-      --ok-subtle: rgba(63, 185, 80, 0.15);
       --warn: var(--warning, #d29922);
-      --warn-subtle: rgba(210, 153, 34, 0.15);
       --danger: var(--danger, #f85149);
-      --danger-subtle: rgba(248, 81, 73, 0.15);
-      --grid-bg: #0d1117;
-      --grid-line: #161b22;
+      --board-bg: #0d1117;
+      --board-dot: #30363d;
+      --board-grid: #161b22;
       --snake-head: #2f81f7;
       --snake-body: #1f6feb;
-      --snake-tail: #388bfd;
-      --food-fill: #3fb950;
+      --bar-idle: #484f58;
+      --track-bg: #161b22;
     }
   }
   html.dark {
-    --canvas: var(--app-background, #0d1117);
+    --bg: var(--app-background, #0d1117);
     --surface: var(--app-card, #161b22);
     --border: var(--app-border, #30363d);
-    --border-muted: var(--app-card-border, #21262d);
+    --border-subtle: var(--app-card-border, #21262d);
     --text: var(--app-foreground, #e6edf3);
     --muted: var(--app-muted-foreground, #7d8590);
     --accent: var(--app-primary, #2f81f7);
-    --accent-subtle: rgba(47, 129, 247, 0.15);
+    --accent-dim: rgba(47, 129, 247, 0.16);
     --ok: var(--success, #3fb950);
-    --ok-subtle: rgba(63, 185, 80, 0.15);
     --warn: var(--warning, #d29922);
-    --warn-subtle: rgba(210, 153, 34, 0.15);
     --danger: var(--danger, #f85149);
-    --danger-subtle: rgba(248, 81, 73, 0.15);
-    --grid-bg: #0d1117;
-    --grid-line: #161b22;
+    --board-bg: #0d1117;
+    --board-dot: #30363d;
+    --board-grid: #161b22;
     --snake-head: #2f81f7;
     --snake-body: #1f6feb;
-    --snake-tail: #388bfd;
-    --food-fill: #3fb950;
+    --bar-idle: #484f58;
+    --track-bg: #161b22;
   }
   html.light {
-    --canvas: var(--app-background, #ffffff);
+    --bg: var(--app-background, #ffffff);
     --surface: var(--app-card, #f6f8fa);
     --border: var(--app-border, #d0d7de);
-    --border-muted: var(--app-card-border, #e1e4e8);
+    --border-subtle: var(--app-card-border, #e6ebf1);
     --text: var(--app-foreground, #1f2328);
     --muted: var(--app-muted-foreground, #656d76);
     --accent: var(--app-primary, #0969da);
-    --accent-subtle: rgba(9, 105, 218, 0.10);
+    --accent-dim: rgba(9, 105, 218, 0.12);
     --ok: var(--success, #1a7f37);
-    --ok-subtle: rgba(26, 127, 55, 0.12);
     --warn: var(--warning, #9a6700);
-    --warn-subtle: rgba(154, 103, 0, 0.12);
     --danger: var(--danger, #cf222e);
-    --danger-subtle: rgba(207, 34, 46, 0.12);
-    --grid-bg: #f6f8fa;
-    --grid-line: #e6ebf1;
+    --board-bg: #fafbfc;
+    --board-dot: #d8dee4;
+    --board-grid: #eff2f5;
     --snake-head: #0969da;
     --snake-body: #218bff;
-    --snake-tail: #79c0ff;
-    --food-fill: #1a7f37;
+    --bar-idle: #afb8c1;
+    --track-bg: #eaeef2;
   }
+
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    padding: 20px 24px 32px;
-    background: var(--canvas);
+    padding: 24px 32px 40px;
+    background: var(--bg);
     color: var(--text);
     font-family: var(--font-ui);
     font-size: 14px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
   }
-  .page { max-width: 1080px; margin: 0 auto; }
-  .header-row {
+  @media (max-width: 640px) {
+    body { padding: 16px; }
+  }
+
+  .shell {
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  .topbar {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: 16px;
     flex-wrap: wrap;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border-muted);
-    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 24px;
   }
-  h1 {
-    font-size: 20px;
-    font-weight: 600;
-    margin: 0;
-    letter-spacing: -0.01em;
-  }
-  .subtitle {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .conn-strip {
+  .brand {
     display: flex;
     align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    padding: 10px 14px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-bottom: 16px;
-  }
-  .conn-strip label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: var(--muted);
-    font-family: var(--font-mono);
-  }
-  input[type="text"], input[type="password"], select {
-    height: 32px;
-    padding: 4px 10px;
-    font-family: var(--font-mono);
-    font-size: 13px;
-    color: var(--text);
-    background: var(--canvas);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    outline: none;
-  }
-  input[type="text"]:focus, input[type="password"]:focus, select:focus, button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-  }
-  .controls-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
   }
-  .btn-group {
+  .brand-title {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .brand-sep {
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .status-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 210px;
+  }
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+  }
+  .dot.live { background: var(--ok); }
+  .dot.warn { background: var(--warn); }
+  .dot.err { background: var(--danger); }
+
+  .toolbar {
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
   }
   button {
-    height: 34px;
-    padding: 6px 14px;
+    height: 32px;
+    padding: 0 12px;
     font-family: var(--font-ui);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text);
-    background: var(--surface);
+    background: transparent;
     border: 1px solid var(--border);
     border-radius: 6px;
     cursor: pointer;
-    transition: background-color 150ms ease, border-color 150ms ease;
+    transition: background-color 150ms ease, border-color 150ms ease, opacity 150ms ease;
   }
   button:hover:not(:disabled) {
-    border-color: var(--muted);
+    background: var(--surface);
   }
   button.primary {
     background: var(--accent);
@@ -200,216 +186,249 @@
     border-color: var(--accent);
   }
   button.primary:hover:not(:disabled) {
-    opacity: 0.92;
+    opacity: 0.9;
   }
-  button:disabled {
-    opacity: 0.5;
-    cursor: default;
+  button.ghost {
+    border-color: transparent;
+    color: var(--muted);
+    font-weight: 400;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 0 8px;
   }
-  .toggle-label {
-    display: inline-flex;
+  button.ghost:hover {
+    color: var(--text);
+    background: var(--surface);
+  }
+  button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .config-drawer {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 0 0 18px;
+    margin-bottom: 22px;
+    border-bottom: 1px solid var(--border-subtle);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .config-drawer[hidden] {
+    display: none !important;
+  }
+  .config-drawer label {
+    display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 13px;
+  }
+  .config-drawer input[type="text"],
+  .config-drawer input[type="password"] {
+    height: 30px;
+    padding: 0 10px;
+    font-family: var(--font-mono);
+    font-size: 12px;
     color: var(--text);
-    cursor: pointer;
-    user-select: none;
-  }
-  .main-grid {
-    display: grid;
-    grid-template-columns: 380px 1fr;
-    gap: 24px;
-    align-items: start;
-  }
-  @media (max-width: 820px) {
-    .main-grid { grid-template-columns: 1fr; }
-  }
-  .board-frame {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 14px;
+    border-radius: 4px;
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 44px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .workspace {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+  }
+
+  .board-wrap {
+    width: 100%;
+    max-width: 400px;
   }
   canvas#board {
     display: block;
     width: 100%;
     aspect-ratio: 1 / 1;
     border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--grid-bg);
+    border-radius: 6px;
+    background: var(--board-bg);
   }
-  .board-footer {
+  .board-caption {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 10px;
+    padding-top: 10px;
     font-family: var(--font-mono);
     font-size: 12px;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }
-  .metrics-strip {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface);
-    margin-bottom: 18px;
-    overflow: hidden;
-  }
-  .metric-cell {
-    padding: 10px 12px;
-    border-right: 1px solid var(--border-muted);
+
+  .readout {
     min-width: 0;
   }
-  .metric-cell:last-child { border-right: none; }
+  .metrics-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 22px;
+  }
   .metric-label {
     font-size: 12px;
     color: var(--muted);
-    margin-bottom: 2px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    margin-bottom: 4px;
   }
-  .metric-val {
+  .metric-value {
     font-family: var(--font-mono);
-    font-size: 18px;
+    font-size: 26px;
     font-weight: 600;
-    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
     color: var(--text);
+    font-variant-numeric: tabular-nums;
   }
-  .section-title {
-    font-size: 14px;
-    font-weight: 600;
-    margin: 0 0 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-  }
-  .section-title span.sub {
-    font-family: var(--font-mono);
-    font-size: 12px;
+  .metric-unit {
+    font-size: 13px;
     font-weight: 400;
     color: var(--muted);
+    margin-left: 3px;
   }
-  .prob-list {
-    border-top: 1px solid var(--border-muted);
-    margin-bottom: 18px;
+
+  .section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .mask-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .mask-toggle input {
+    margin: 0;
+    accent-color: var(--accent);
+  }
+
+  .prob-table {
+    border-top: 1px solid var(--border-subtle);
+    margin-bottom: 24px;
   }
   .prob-row {
     display: grid;
-    grid-template-columns: 68px 86px 1fr 64px;
+    grid-template-columns: 72px 1fr 68px 54px;
     align-items: center;
-    gap: 10px;
-    padding: 9px 0;
-    border-bottom: 1px solid var(--border-muted);
+    gap: 14px;
+    height: 40px;
+    border-bottom: 1px solid var(--border-subtle);
     font-family: var(--font-mono);
     font-size: 13px;
     font-variant-numeric: tabular-nums;
   }
-  .dir-name {
-    font-weight: 600;
-    color: var(--text);
-  }
-  .dir-name.selected {
-    color: var(--accent);
-  }
-  .dir-safety {
-    font-size: 12px;
+  .dir-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     color: var(--muted);
+    font-weight: 400;
   }
-  .dir-safety.unsafe {
-    color: var(--danger);
+  .dir-cell.active {
+    color: var(--accent);
+    font-weight: 600;
   }
-  .bar-track {
-    height: 10px;
-    background: var(--surface);
-    border: 1px solid var(--border-muted);
+  .dir-arrow {
+    display: inline-block;
+    width: 14px;
+    text-align: center;
+  }
+  .meter-track {
+    height: 6px;
+    background: var(--track-bg);
     border-radius: 3px;
     overflow: hidden;
   }
-  .bar-fill {
+  .meter-fill {
     height: 100%;
     width: 0%;
-    background: var(--muted);
-    transition: width 120ms ease, background-color 120ms ease;
+    background: var(--bar-idle);
+    border-radius: 3px;
+    transition: width 100ms ease, background-color 100ms ease;
   }
-  .bar-fill.selected {
+  .meter-fill.active {
     background: var(--accent);
   }
-  .bar-fill.unsafe-pick {
+  .meter-fill.danger {
     background: var(--danger);
   }
-  .prob-val {
+  .pct-cell {
     text-align: right;
     color: var(--text);
-  }
-  .feature-line {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--muted);
-    padding: 8px 12px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-bottom: 16px;
-    font-variant-numeric: tabular-nums;
-    overflow-x: auto;
-    white-space: nowrap;
-  }
-  .status-banner {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .status-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--muted);
-    margin-right: 6px;
-  }
-  .status-dot.live { background: var(--ok); }
-  .status-dot.warn { background: var(--warn); }
-  .status-dot.err { background: var(--danger); }
-  .alert-badge {
-    display: inline-block;
-    padding: 1px 8px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    border-radius: 9999px;
-    color: var(--danger);
-    background: var(--danger-subtle);
-    border: 1px solid var(--danger);
-  }
-  details {
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface);
-    padding: 10px 14px;
-  }
-  details summary {
-    cursor: pointer;
     font-weight: 600;
-    font-size: 13px;
-    color: var(--text);
-    user-select: none;
   }
-  pre.payload {
-    margin: 10px 0 0;
-    padding: 10px;
-    background: var(--canvas);
-    border: 1px solid var(--border-muted);
-    border-radius: 4px;
+  .pct-cell.muted {
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .safety-cell {
+    text-align: right;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .safety-cell.blocked {
+    color: var(--danger);
+  }
+
+  details.inspector {
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 14px;
+  }
+  details.inspector summary {
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    user-select: none;
+    list-style: none;
+  }
+  details.inspector summary::-webkit-details-marker {
+    display: none;
+  }
+  details.inspector summary:hover {
+    color: var(--text);
+  }
+  pre#payload-view {
+    margin: 12px 0 0;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
     font-family: var(--font-mono);
     font-size: 12px;
     line-height: 1.45;
-    max-height: 260px;
+    color: var(--text);
+    max-height: 240px;
     overflow: auto;
     white-space: pre-wrap;
     word-break: break-word;
@@ -417,131 +436,106 @@
 </style>
 </head>
 <body>
-<div class="page">
-  <div class="header-row">
-    <div>
-      <h1>djev snake</h1>
-      <div class="subtitle">1-step DiffusionGemma choice probabilities over relative board features · POST /v1/systemone</div>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-title">djev <span class="brand-sep">/</span> snake</span>
+      <span class="status-line">
+        <span id="dot" class="dot"></span>
+        <span id="status-text">Idle · ready</span>
+      </span>
     </div>
-    <div class="status-banner">
-      <span><span id="dot" class="status-dot"></span><span id="status-text">Idle · ready</span></span>
-      <span id="anomaly-badge" class="alert-badge" hidden>Game Over</span>
+    <div class="toolbar">
+      <button id="btn-config" class="ghost" type="button">Endpoint</button>
+      <button id="btn-theme" class="ghost" type="button">Theme</button>
+      <button id="btn-start" class="primary" type="button">Start</button>
+      <button id="btn-step" type="button">Step</button>
+      <button id="btn-reset" type="button">Reset</button>
     </div>
-  </div>
+  </header>
 
-  <div class="conn-strip">
+  <div id="config-drawer" class="config-drawer" hidden>
     <label>
-      Endpoint URL
-      <input id="endpoint" type="text" style="width: 340px" placeholder="/v1/systemone or https://...run.app">
+      URL
+      <input id="endpoint" type="text" style="width: 320px" placeholder="/v1/systemone or https://...run.app">
     </label>
     <label>
       Bearer Token
       <input id="token" type="password" style="width: 180px" placeholder="optional API_KEY">
     </label>
-    <label>
-      Pace
-      <select id="pace">
-        <option value="0">Uncapped (as fast as /v1/systemone replies)</option>
-        <option value="80" selected>12.5 ticks/s (80 ms)</option>
-        <option value="150">6.7 ticks/s (150 ms)</option>
-        <option value="300">3.3 ticks/s (300 ms)</option>
-      </select>
-    </label>
   </div>
 
-  <div class="controls-bar">
-    <div class="btn-group">
-      <button id="btn-start" class="primary">Start</button>
-      <button id="btn-step">Step</button>
-      <button id="btn-reset">Reset</button>
-    </div>
-    <div class="btn-group">
-      <label class="toggle-label">
-        <input id="chk-mask" type="checkbox" checked>
-        <span>Strict Safe-Move Mask (restrict argmax to safe_moves)</span>
-      </label>
-    </div>
-  </div>
-
-  <div class="main-grid">
-    <div class="board-frame">
-      <canvas id="board" width="360" height="360"></canvas>
-      <div class="board-footer">
-        <span id="coords-text">head [6, 6] · food [9, 3]</span>
-        <span>Space: start/pause · R: reset</span>
+  <main class="workspace">
+    <div class="board-wrap">
+      <canvas id="board"></canvas>
+      <div class="board-caption">
+        <span id="coords-text">head [5, 6] · food [9, 3]</span>
+        <span>space: play/pause · r: reset</span>
       </div>
     </div>
 
-    <div>
-      <div class="metrics-strip">
-        <div class="metric-cell">
+    <div class="readout">
+      <div class="metrics-row">
+        <div>
           <div class="metric-label">Score</div>
-          <div id="m-score" class="metric-val">0</div>
+          <div id="m-score" class="metric-value">0</div>
         </div>
-        <div class="metric-cell">
-          <div class="metric-label">Length</div>
-          <div id="m-len" class="metric-val">4</div>
+        <div>
+          <div class="metric-label">Step</div>
+          <div id="m-steps" class="metric-value">0</div>
         </div>
-        <div class="metric-cell">
-          <div class="metric-label">Steps</div>
-          <div id="m-steps" class="metric-val">0</div>
-        </div>
-        <div class="metric-cell">
+        <div>
           <div class="metric-label">Latency</div>
-          <div id="m-ms" class="metric-val">0 ms</div>
-        </div>
-        <div class="metric-cell">
-          <div class="metric-label">Rate · Shield</div>
-          <div id="m-rate" class="metric-val">0.0/s · 0</div>
+          <div class="metric-value"><span id="m-ms">0</span><span class="metric-unit">ms</span></div>
         </div>
       </div>
 
-      <div class="section-title">
-        <span>Direction probabilities (answers.move.probabilities)</span>
-        <span id="chosen-summary" class="sub">choice: right · conf 0.00</span>
+      <div class="section-head">
+        <span class="section-title">POST /v1/systemone probabilities</span>
+        <label class="mask-toggle">
+          <input id="chk-mask" type="checkbox" checked>
+          <span>safe mask</span>
+        </label>
       </div>
 
-      <div class="prob-list" id="prob-list">
-        <div class="prob-row" data-dir="up">
-          <span class="dir-name" id="name-up">up</span>
-          <span class="dir-safety" id="safe-up">safe</span>
-          <div class="bar-track"><div class="bar-fill" id="bar-up"></div></div>
-          <span class="prob-val" id="val-up">25.0%</span>
+      <div class="prob-table">
+        <div class="prob-row">
+          <div class="dir-cell" id="name-up"><span class="dir-arrow">↑</span><span>up</span></div>
+          <div class="meter-track"><div class="meter-fill" id="bar-up"></div></div>
+          <div class="pct-cell muted" id="val-up">25.0%</div>
+          <div class="safety-cell" id="safe-up">safe</div>
         </div>
-        <div class="prob-row" data-dir="down">
-          <span class="dir-name" id="name-down">down</span>
-          <span class="dir-safety" id="safe-down">safe</span>
-          <div class="bar-track"><div class="bar-fill" id="bar-down"></div></div>
-          <span class="prob-val" id="val-down">25.0%</span>
+        <div class="prob-row">
+          <div class="dir-cell" id="name-down"><span class="dir-arrow">↓</span><span>down</span></div>
+          <div class="meter-track"><div class="meter-fill" id="bar-down"></div></div>
+          <div class="pct-cell muted" id="val-down">25.0%</div>
+          <div class="safety-cell" id="safe-down">safe</div>
         </div>
-        <div class="prob-row" data-dir="left">
-          <span class="dir-name" id="name-left">left</span>
-          <span class="dir-safety" id="safe-left">neck</span>
-          <div class="bar-track"><div class="bar-fill" id="bar-left"></div></div>
-          <span class="prob-val" id="val-left">25.0%</span>
+        <div class="prob-row">
+          <div class="dir-cell" id="name-left"><span class="dir-arrow">←</span><span>left</span></div>
+          <div class="meter-track"><div class="meter-fill" id="bar-left"></div></div>
+          <div class="pct-cell muted" id="val-left">0.0%</div>
+          <div class="safety-cell blocked" id="safe-left">neck</div>
         </div>
-        <div class="prob-row" data-dir="right">
-          <span class="dir-name" id="name-right">right</span>
-          <span class="dir-safety" id="safe-right">safe</span>
-          <div class="bar-track"><div class="bar-fill" id="bar-right"></div></div>
-          <span class="prob-val" id="val-right">25.0%</span>
+        <div class="prob-row">
+          <div class="dir-cell active" id="name-right"><span class="dir-arrow">→</span><span>right</span></div>
+          <div class="meter-track"><div class="meter-fill active" id="bar-right"></div></div>
+          <div class="pct-cell" id="val-right">50.0%</div>
+          <div class="safety-cell" id="safe-right">safe</div>
         </div>
       </div>
 
-      <div class="feature-line" id="feature-strip">
-        safe_moves: [up, down, right] · food_delta: dx=+3, dy=-3 (right, up) · open_space: 140
-      </div>
-
-      <details>
-        <summary>▶ Inspect live POST /v1/systemone state and response JSON</summary>
-        <pre class="payload" id="payload-view"></pre>
+      <details class="inspector">
+        <summary>▸ Inspect live state and response JSON</summary>
+        <pre id="payload-view"></pre>
       </details>
     </div>
-  </div>
+  </main>
 </div>
 
 <script>
 const GRID = 12;
+const CSS_SIZE = 400;
 const DIRS = ["up", "down", "left", "right"];
 const VEC = {
   up: [0, -1],
@@ -549,12 +543,11 @@ const VEC = {
   left: [-1, 0],
   right: [1, 0]
 };
-const OPP = { up: "down", down: "up", left: "right", right: "left" };
 
 const QUESTIONS_SCHEMA = {
   move: {
     type: "choice",
-    instructions: "Choose the next direction for the snake head. Select a direction in safe_moves that moves toward food (matching food_delta preferred directions and minimal manhattan_to_food) while preserving open_space.",
+    instructions: "Select the next move for the snake head. Choose a direction in safe_moves that reduces manhattan_to_food while preserving open_space.",
     criteria: {
       up: "Move north (y - 1)",
       down: "Move south (y + 1)",
@@ -589,6 +582,20 @@ $("token").onchange = () => {
   try { localStorage.setItem("djev_api_key", $("token").value.trim()); } catch (e) {}
 };
 
+$("btn-config").onclick = () => {
+  const dr = $("config-drawer");
+  dr.hidden = !dr.hidden;
+};
+
+$("btn-theme").onclick = () => {
+  const root = document.documentElement;
+  const isDark = root.classList.contains("dark") ||
+    (!root.classList.contains("light") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  root.classList.toggle("dark", !isDark);
+  root.classList.toggle("light", isDark);
+  drawBoard();
+};
+
 function resolveEndpointUrl() {
   let u = $("endpoint").value.trim() || "/v1/systemone";
   if (u.startsWith("http://") || u.startsWith("https://")) {
@@ -601,15 +608,13 @@ function resolveEndpointUrl() {
 
 let snake = [];
 let direction = "right";
+let nextChoice = "right";
 let food = [9, 3];
 let score = 0;
 let steps = 0;
-let shieldCount = 0;
 let alive = true;
 let running = false;
 let inflight = false;
-let lastMs = 0;
-let recentTicks = [];
 let sandboxFallback = false;
 
 function spawnFood(body) {
@@ -623,25 +628,6 @@ function spawnFood(body) {
   if (!free.length) return [0, 0];
   const idx = (steps * 17 + score * 31 + 7) % free.length;
   return free[idx];
-}
-
-function resetGame() {
-  running = false;
-  $("btn-start").textContent = "Start";
-  snake = [[5, 6], [4, 6], [3, 6], [2, 6]];
-  direction = "right";
-  score = 0;
-  steps = 0;
-  shieldCount = 0;
-  alive = true;
-  lastMs = 0;
-  recentTicks = [];
-  food = spawnFood(snake);
-  $("anomaly-badge").hidden = true;
-  setStatus("Idle · ready", "");
-  const st = buildState();
-  updateUI(st, { up: 0.25, down: 0.25, left: 0.0, right: 0.50 }, "right", "right", 0);
-  drawBoard();
 }
 
 function floodFillCount(startX, startY, bodySet) {
@@ -671,7 +657,6 @@ function buildState() {
   const [fx, fy] = food;
   const dx = fx - hx;
   const dy = fy - hy;
-  // Tail tip moves away unless eating, so exclude final segment from obstacle set
   const bodyObstacles = new Set(snake.slice(0, -1).map(([x, y]) => x + "," + y));
   const [nxNeck, nyNeck] = snake[1] || [-1, -1];
 
@@ -741,17 +726,16 @@ function buildState() {
 }
 
 function simulateSystemOne(state) {
-  // Calibrated fallback when running inside Artifax's connect-src 'none' iframe sandbox
   const logits = {};
   for (const d of DIRS) {
     const info = state.move_analysis[d];
     if (!info.safe) {
-      logits[d] = -4.2;
+      logits[d] = -4.5;
     } else {
-      let l = 1.2;
-      if (info.reduces_distance) l += 1.6;
+      let l = 1.1;
+      if (info.reduces_distance) l += 1.7;
       l += Math.min(info.open_space, 60) * 0.025;
-      if (d === state.recommended_safe_move) l += 0.9;
+      if (d === state.recommended_safe_move) l += 1.0;
       logits[d] = l;
     }
   }
@@ -772,7 +756,7 @@ function simulateSystemOne(state) {
     }
   }
   return {
-    model: "dgemma-sandbox-sim",
+    model: "dgemma-sandbox",
     answers: {
       move: {
         type: "choice",
@@ -782,8 +766,8 @@ function simulateSystemOne(state) {
       }
     },
     diagnostics: {
-      mode: "artifax_sandbox_fallback",
-      timing: { reads: 1, total_ms: 14.2 }
+      mode: "sandbox_fallback",
+      timing: { reads: 1, total_ms: 12.0 }
     }
   };
 }
@@ -816,14 +800,163 @@ async function requestDecision(state) {
     sandboxFallback = false;
     return { reqBody, data, ms };
   } catch (err) {
-    // In Artifax iframe (opaque origin with connect-src 'none') or offline preview,
-    // gracefully fall back so the interactive board remains playable.
-    const ms = Math.max(8, Math.round(performance.now() - t0));
+    const ms = Math.max(9, Math.round(performance.now() - t0));
     sandboxFallback = true;
     const data = simulateSystemOne(state);
-    data._network_note = String(err.message || err);
     return { reqBody, data, ms };
   }
+}
+
+function setStatus(text, kind) {
+  $("status-text").textContent = text;
+  $("dot").className = "dot" + (kind ? " " + kind : "");
+}
+
+function updateUI(state, probs, finalChoice, ms) {
+  $("m-score").textContent = String(score);
+  $("m-steps").textContent = String(steps);
+  $("m-ms").textContent = String(ms);
+
+  const [hx, hy] = state.head;
+  const [fx, fy] = state.food;
+  $("coords-text").textContent = `head [${hx}, ${hy}] · food [${fx}, ${fy}]`;
+
+  for (const d of DIRS) {
+    const p = Math.max(0, Math.min(1, Number(probs[d] || 0)));
+    const pct = (p * 100).toFixed(1) + "%";
+    const info = state.move_analysis[d];
+    const isSelected = d === finalChoice;
+
+    $("name-" + d).className = "dir-cell" + (isSelected ? " active" : "");
+    $("val-" + d).className = "pct-cell" + (isSelected ? "" : " muted");
+    $("val-" + d).textContent = pct;
+
+    const safeEl = $("safe-" + d);
+    safeEl.textContent = info.safe ? "safe" : info.reason;
+    safeEl.className = "safety-cell" + (info.safe ? "" : " blocked");
+
+    const barEl = $("bar-" + d);
+    barEl.style.width = (p * 100).toFixed(1) + "%";
+    barEl.className = "meter-fill" + (isSelected ? (info.safe ? " active" : " danger") : "");
+  }
+}
+
+function drawBoard() {
+  const canvas = $("board");
+  const dpr = window.devicePixelRatio || 1;
+  const targetW = Math.round(CSS_SIZE * dpr);
+  if (canvas.width !== targetW || canvas.height !== targetW) {
+    canvas.width = targetW;
+    canvas.height = targetW;
+  }
+  const ctx = canvas.getContext("2d");
+  ctx.save();
+  ctx.scale(dpr, dpr);
+
+  const W = CSS_SIZE;
+  const H = CSS_SIZE;
+  const cell = W / GRID;
+  const styles = getComputedStyle(document.documentElement);
+  const bg = styles.getPropertyValue("--board-bg").trim() || "#0d1117";
+  const dotCol = styles.getPropertyValue("--board-dot").trim() || "#30363d";
+  const gridCol = styles.getPropertyValue("--board-grid").trim() || "#161b22";
+  const headCol = styles.getPropertyValue("--snake-head").trim() || "#2f81f7";
+  const bodyCol = styles.getPropertyValue("--snake-body").trim() || "#1f6feb";
+  const foodCol = styles.getPropertyValue("--ok").trim() || "#3fb950";
+  const accentCol = styles.getPropertyValue("--accent").trim() || "#2f81f7";
+
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle hairline grid + intersection dot matrix
+  ctx.strokeStyle = gridCol;
+  ctx.lineWidth = 1;
+  for (let i = 1; i < GRID; i++) {
+    const p = Math.floor(i * cell) + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(p, 0);
+    ctx.lineTo(p, H);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, p);
+    ctx.lineTo(W, p);
+    ctx.stroke();
+  }
+  ctx.fillStyle = dotCol;
+  for (let y = 1; y < GRID; y++) {
+    for (let x = 1; x < GRID; x++) {
+      ctx.beginPath();
+      ctx.arc(x * cell, y * cell, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Ghost vector line from head toward chosen next cell
+  if (snake.length > 0 && alive && nextChoice) {
+    const [hx, hy] = snake[0];
+    const [vx, vy] = VEC[nextChoice] || [0, 0];
+    const cx = (hx + 0.5) * cell;
+    const cy = (hy + 0.5) * cell;
+    const tx = (hx + vx + 0.5) * cell;
+    const ty = (hy + vy + 0.5) * cell;
+    ctx.strokeStyle = accentCol;
+    ctx.globalAlpha = 0.28;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(tx, ty);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1.0;
+  }
+
+  // Target food with crisp subtle ring
+  const [fx, fy] = food;
+  const fcx = (fx + 0.5) * cell;
+  const fcy = (fy + 0.5) * cell;
+  ctx.strokeStyle = foodCol;
+  ctx.globalAlpha = 0.25;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(fcx, fcy, cell * 0.36, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1.0;
+  ctx.fillStyle = foodCol;
+  ctx.beginPath();
+  ctx.arc(fcx, fcy, cell * 0.24, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Snake body segments
+  for (let i = snake.length - 1; i >= 0; i--) {
+    const [sx, sy] = snake[i];
+    const isHead = i === 0;
+    ctx.fillStyle = isHead ? headCol : bodyCol;
+    ctx.globalAlpha = isHead ? 1.0 : Math.max(0.42, 0.9 - (i / (snake.length + 5)) * 0.48);
+    const pad = isHead ? cell * 0.09 : cell * 0.14;
+    const radius = isHead ? 6 : 4;
+    ctx.beginPath();
+    ctx.roundRect(sx * cell + pad, sy * cell + pad, cell - pad * 2, cell - pad * 2, radius);
+    ctx.fill();
+
+    // Head direction indicator dots
+    if (isHead) {
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = "#ffffff";
+      const [vx, vy] = VEC[direction] || [1, 0];
+      const hcx = (sx + 0.5) * cell;
+      const hcy = (sy + 0.5) * cell;
+      const fwd = cell * 0.17;
+      const side = cell * 0.13;
+      const px = -vy, py = vx;
+      ctx.beginPath();
+      ctx.arc(hcx + vx * fwd + px * side, hcy + vy * fwd + py * side, 1.8, 0, Math.PI * 2);
+      ctx.arc(hcx + vx * fwd - px * side, hcy + vy * fwd - py * side, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
 }
 
 function applyMove(chosenDir) {
@@ -837,9 +970,7 @@ function applyMove(chosenDir) {
     alive = false;
     running = false;
     $("btn-start").textContent = "Start";
-    $("anomaly-badge").hidden = false;
-    $("anomaly-badge").textContent = `Collision (${chosenDir})`;
-    setStatus(`Stopped · collision on ${chosenDir}`, "err");
+    setStatus(`Collision on ${chosenDir}`, "err");
     drawBoard();
     return;
   }
@@ -855,110 +986,25 @@ function applyMove(chosenDir) {
   steps += 1;
 }
 
-function setStatus(text, kind) {
-  $("status-text").textContent = text;
-  const dot = $("dot");
-  dot.className = "status-dot" + (kind ? " " + kind : "");
-}
-
-function updateUI(state, probs, rawChoice, finalChoice, ms) {
-  $("m-score").textContent = String(score);
-  $("m-len").textContent = String(snake.length);
-  $("m-steps").textContent = String(steps);
-  $("m-ms").textContent = `${ms} ms`;
-
-  const now = performance.now();
-  if (ms > 0) {
-    recentTicks.push(now);
-    while (recentTicks.length > 1 && now - recentTicks[0] > 3000) {
-      recentTicks.shift();
-    }
-  }
-  const rate = recentTicks.length > 1
-    ? ((recentTicks.length - 1) * 1000 / (now - recentTicks[0])).toFixed(1)
-    : "0.0";
-  $("m-rate").textContent = `${rate}/s · ${shieldCount}`;
-
-  const [hx, hy] = state.head;
-  const [fx, fy] = state.food;
-  $("coords-text").textContent = `head [${hx}, ${hy}] · food [${fx}, ${fy}]`;
-
-  const conf = (probs[finalChoice] || 0).toFixed(2);
-  const maskedNote = rawChoice !== finalChoice ? ` (masked from ${rawChoice})` : "";
-  $("chosen-summary").textContent = `choice: ${finalChoice}${maskedNote} · p=${conf}`;
-
-  for (const d of DIRS) {
-    const p = Math.max(0, Math.min(1, Number(probs[d] || 0)));
-    const pct = (p * 100).toFixed(1) + "%";
-    const info = state.move_analysis[d];
-    const isSelected = d === finalChoice;
-
-    $("name-" + d).className = "dir-name" + (isSelected ? " selected" : "");
-    const safeEl = $("safe-" + d);
-    safeEl.textContent = info.safe ? `safe · d=${info.manhattan_to_food}` : info.reason;
-    safeEl.className = "dir-safety" + (info.safe ? "" : " unsafe");
-
-    const barEl = $("bar-" + d);
-    barEl.style.width = (p * 100).toFixed(1) + "%";
-    barEl.className = "bar-fill" + (isSelected ? (info.safe ? " selected" : " unsafe-pick") : "");
-    $("val-" + d).textContent = pct;
-  }
-
-  const fd = state.food_delta;
-  $("feature-strip").textContent =
-    `safe_moves: [${state.safe_moves.join(", ")}] · food_delta: dx=${fd.dx >= 0 ? "+" + fd.dx : fd.dx}, dy=${fd.dy >= 0 ? "+" + fd.dy : fd.dy} (${fd.preferred_horizontal}, ${fd.preferred_vertical})`;
-}
-
-function drawBoard() {
-  const canvas = $("board");
-  const ctx = canvas.getContext("2d");
-  const W = canvas.width;
-  const H = canvas.height;
-  const cell = W / GRID;
-  const styles = getComputedStyle(document.documentElement);
-  const bg = styles.getPropertyValue("--grid-bg").trim() || "#0d1117";
-  const line = styles.getPropertyValue("--grid-line").trim() || "#161b22";
-  const headCol = styles.getPropertyValue("--snake-head").trim() || "#2f81f7";
-  const bodyCol = styles.getPropertyValue("--snake-body").trim() || "#1f6feb";
-  const foodCol = styles.getPropertyValue("--food-fill").trim() || "#3fb950";
-
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.strokeStyle = line;
-  ctx.lineWidth = 1;
-  for (let i = 1; i < GRID; i++) {
-    const pos = Math.floor(i * cell) + 0.5;
-    ctx.beginPath();
-    ctx.moveTo(pos, 0);
-    ctx.lineTo(pos, H);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(0, pos);
-    ctx.lineTo(W, pos);
-    ctx.stroke();
-  }
-
-  // Draw food
-  const [fx, fy] = food;
-  ctx.fillStyle = foodCol;
-  const padF = cell * 0.18;
-  ctx.beginPath();
-  ctx.roundRect(fx * cell + padF, fy * cell + padF, cell - padF * 2, cell - padF * 2, 5);
-  ctx.fill();
-
-  // Draw snake segments
-  for (let i = snake.length - 1; i >= 0; i--) {
-    const [sx, sy] = snake[i];
-    const isHead = i === 0;
-    ctx.fillStyle = isHead ? headCol : bodyCol;
-    ctx.globalAlpha = isHead ? 1.0 : Math.max(0.45, 0.92 - (i / (snake.length + 4)) * 0.45);
-    const pad = isHead ? cell * 0.08 : cell * 0.14;
-    ctx.beginPath();
-    ctx.roundRect(sx * cell + pad, sy * cell + pad, cell - pad * 2, cell - pad * 2, isHead ? 6 : 4);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1.0;
+function resetGame() {
+  running = false;
+  $("btn-start").textContent = "Start";
+  snake = [[5, 6], [4, 6], [3, 6], [2, 6]];
+  direction = "right";
+  nextChoice = "right";
+  score = 0;
+  steps = 0;
+  alive = true;
+  food = spawnFood(snake);
+  setStatus("Idle · ready", "");
+  const st = buildState();
+  updateUI(st, { up: 0.25, down: 0.25, left: 0.0, right: 0.50 }, "right", 0);
+  $("payload-view").textContent = JSON.stringify(
+    { state: st, questions: QUESTIONS_SCHEMA },
+    null,
+    2
+  );
+  drawBoard();
 }
 
 async function stepOnce() {
@@ -966,7 +1012,6 @@ async function stepOnce() {
   inflight = true;
   const state = buildState();
   const { reqBody, data, ms } = await requestDecision(state);
-  lastMs = ms;
   const moveAns = (data.answers && data.answers.move) || {};
   const probs = moveAns.probabilities || { up: 0.25, down: 0.25, left: 0.25, right: 0.25 };
   const rawChoice = moveAns.choice || DIRS.reduce((a, b) => (probs[a] >= probs[b] ? a : b));
@@ -974,10 +1019,10 @@ async function stepOnce() {
   let finalChoice = rawChoice;
   if ($("chk-mask").checked && state.safe_moves.length > 0) {
     if (!state.safe_moves.includes(rawChoice)) {
-      shieldCount += 1;
       finalChoice = state.safe_moves.reduce((a, b) => ((probs[a] || 0) >= (probs[b] || 0) ? a : b));
     }
   }
+  nextChoice = finalChoice;
 
   $("payload-view").textContent = JSON.stringify(
     { request: reqBody, response: data },
@@ -988,12 +1033,12 @@ async function stepOnce() {
   applyMove(finalChoice);
   if (alive) {
     if (sandboxFallback) {
-      setStatus(`Simulating /v1/systemone (sandbox/offline fallback) · ${ms} ms`, "warn");
+      setStatus(`Simulated · ${ms} ms`, "warn");
     } else {
-      setStatus(`Live /v1/systemone (${data.model || "dgemma"}) · ${ms} ms`, "live");
+      setStatus(`Live · ${data.model || "dgemma"} · ${ms} ms`, "live");
     }
   }
-  updateUI(state, probs, rawChoice, finalChoice, ms);
+  updateUI(state, probs, finalChoice, ms);
   drawBoard();
   inflight = false;
 }
@@ -1003,9 +1048,8 @@ async function loop() {
     const tStart = performance.now();
     await stepOnce();
     if (!running || !alive) break;
-    const targetPace = parseInt($("pace").value, 10) || 0;
     const elapsed = performance.now() - tStart;
-    const wait = Math.max(16, targetPace - elapsed);
+    const wait = Math.max(16, 65 - elapsed);
     await new Promise(r => setTimeout(r, wait));
   }
 }
@@ -1031,7 +1075,7 @@ $("btn-step").onclick = async () => {
 $("btn-reset").onclick = () => resetGame();
 
 window.addEventListener("keydown", e => {
-  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.target.tagName === "INPUT") return;
   if (e.code === "Space") {
     e.preventDefault();
     $("btn-start").click();
