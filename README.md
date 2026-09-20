@@ -2,7 +2,8 @@
 
 Serve DiffusionGemma-Jev (`djev`) on a TypeSafe AI compatible API on Cloud Run
 with an NVIDIA RTX PRO 6000 Blackwell GPU. Built on
-[Matt Mastracci (@mmastrac)'s DiffusionGemma structured evaluation mode](https://x.com/mmastrac/status/2100373761195401724).
+[Matt Mastracci (@mmastrac)'s `djev-spark`](https://github.com/mmastrac/djev-spark)
+([announcement](https://x.com/mmastrac/status/2100373761195401724)).
 
 ```typescript
 import { createTypeSafeAi } from '@ai-sdk/typesafe-ai';
@@ -112,9 +113,19 @@ gcloud beta run deploy djev-dgemma \
 # DISABLE_MM=1: passes --language-model-only --skip-mm-profiling to skip SigLIP vision/video encoder profiling (saves another 30s on cold start)
 ```
 
-`ghcr.io/taeold/djev-run:latest` is built from the `Dockerfile` in this repo
-(`vllm/vllm-openai` patched with
-[vLLM PR #57250](https://github.com/vllm-project/vllm/pull/57250)).
+`ghcr.io/taeold/djev-run:latest` is built directly from
+[`mmastrac/djev-spark`](https://github.com/mmastrac/djev-spark) for
+`linux/amd64` (`docker build https://github.com/mmastrac/djev-spark.git`).
+
+### Run the Sample Code
+
+```bash
+npm install
+DJEV_BASE_URL="https://<your-cloud-run-url>/v1" TYPESAFE_AI_API_KEY="$(gcloud auth print-identity-token)" npm start
+```
+
+Open `snake.html` in a browser (or visit `https://<your-cloud-run-url>/`) and
+paste your Cloud Run URL to run the live 1-step diffusion Snake demo.
 
 --------------------------------------------------------------------------------
 

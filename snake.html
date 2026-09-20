@@ -1,0 +1,1053 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>djev snake · 1-step diffusion decisions</title>
+<style>
+  :root {
+    --canvas: var(--app-background, #ffffff);
+    --surface: var(--app-card, #f6f8fa);
+    --border: var(--app-border, #d0d7de);
+    --border-muted: var(--app-card-border, #e1e4e8);
+    --text: var(--app-foreground, #1f2328);
+    --muted: var(--app-muted-foreground, #656d76);
+    --accent: var(--app-primary, #0969da);
+    --accent-subtle: rgba(9, 105, 218, 0.10);
+    --ok: var(--success, #1a7f37);
+    --ok-subtle: rgba(26, 127, 55, 0.12);
+    --warn: var(--warning, #9a6700);
+    --warn-subtle: rgba(154, 103, 0, 0.12);
+    --danger: var(--danger, #cf222e);
+    --danger-subtle: rgba(207, 34, 46, 0.12);
+    --grid-bg: #f6f8fa;
+    --grid-line: #e6ebf1;
+    --snake-head: #0969da;
+    --snake-body: #218bff;
+    --snake-tail: #79c0ff;
+    --food-fill: #1a7f37;
+    --font-ui: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif);
+    --font-mono: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --canvas: var(--app-background, #0d1117);
+      --surface: var(--app-card, #161b22);
+      --border: var(--app-border, #30363d);
+      --border-muted: var(--app-card-border, #21262d);
+      --text: var(--app-foreground, #e6edf3);
+      --muted: var(--app-muted-foreground, #7d8590);
+      --accent: var(--app-primary, #2f81f7);
+      --accent-subtle: rgba(47, 129, 247, 0.15);
+      --ok: var(--success, #3fb950);
+      --ok-subtle: rgba(63, 185, 80, 0.15);
+      --warn: var(--warning, #d29922);
+      --warn-subtle: rgba(210, 153, 34, 0.15);
+      --danger: var(--danger, #f85149);
+      --danger-subtle: rgba(248, 81, 73, 0.15);
+      --grid-bg: #0d1117;
+      --grid-line: #161b22;
+      --snake-head: #2f81f7;
+      --snake-body: #1f6feb;
+      --snake-tail: #388bfd;
+      --food-fill: #3fb950;
+    }
+  }
+  html.dark {
+    --canvas: var(--app-background, #0d1117);
+    --surface: var(--app-card, #161b22);
+    --border: var(--app-border, #30363d);
+    --border-muted: var(--app-card-border, #21262d);
+    --text: var(--app-foreground, #e6edf3);
+    --muted: var(--app-muted-foreground, #7d8590);
+    --accent: var(--app-primary, #2f81f7);
+    --accent-subtle: rgba(47, 129, 247, 0.15);
+    --ok: var(--success, #3fb950);
+    --ok-subtle: rgba(63, 185, 80, 0.15);
+    --warn: var(--warning, #d29922);
+    --warn-subtle: rgba(210, 153, 34, 0.15);
+    --danger: var(--danger, #f85149);
+    --danger-subtle: rgba(248, 81, 73, 0.15);
+    --grid-bg: #0d1117;
+    --grid-line: #161b22;
+    --snake-head: #2f81f7;
+    --snake-body: #1f6feb;
+    --snake-tail: #388bfd;
+    --food-fill: #3fb950;
+  }
+  html.light {
+    --canvas: var(--app-background, #ffffff);
+    --surface: var(--app-card, #f6f8fa);
+    --border: var(--app-border, #d0d7de);
+    --border-muted: var(--app-card-border, #e1e4e8);
+    --text: var(--app-foreground, #1f2328);
+    --muted: var(--app-muted-foreground, #656d76);
+    --accent: var(--app-primary, #0969da);
+    --accent-subtle: rgba(9, 105, 218, 0.10);
+    --ok: var(--success, #1a7f37);
+    --ok-subtle: rgba(26, 127, 55, 0.12);
+    --warn: var(--warning, #9a6700);
+    --warn-subtle: rgba(154, 103, 0, 0.12);
+    --danger: var(--danger, #cf222e);
+    --danger-subtle: rgba(207, 34, 46, 0.12);
+    --grid-bg: #f6f8fa;
+    --grid-line: #e6ebf1;
+    --snake-head: #0969da;
+    --snake-body: #218bff;
+    --snake-tail: #79c0ff;
+    --food-fill: #1a7f37;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 20px 24px 32px;
+    background: var(--canvas);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1080px; margin: 0 auto; }
+  .header-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-muted);
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .conn-strip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 16px;
+  }
+  .conn-strip label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+  input[type="text"], input[type="password"], select {
+    height: 32px;
+    padding: 4px 10px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text);
+    background: var(--canvas);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    outline: none;
+  }
+  input[type="text"]:focus, input[type="password"]:focus, select:focus, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .controls-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .btn-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  button {
+    height: 34px;
+    padding: 6px 14px;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 150ms ease, border-color 150ms ease;
+  }
+  button:hover:not(:disabled) {
+    border-color: var(--muted);
+  }
+  button.primary {
+    background: var(--accent);
+    color: #ffffff;
+    border-color: var(--accent);
+  }
+  button.primary:hover:not(:disabled) {
+    opacity: 0.92;
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    user-select: none;
+  }
+  .main-grid {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 820px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+  .board-frame {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+  }
+  canvas#board {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--grid-bg);
+  }
+  .board-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .metrics-strip {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    margin-bottom: 18px;
+    overflow: hidden;
+  }
+  .metric-cell {
+    padding: 10px 12px;
+    border-right: 1px solid var(--border-muted);
+    min-width: 0;
+  }
+  .metric-cell:last-child { border-right: none; }
+  .metric-label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .metric-val {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+  }
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .section-title span.sub {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--muted);
+  }
+  .prob-list {
+    border-top: 1px solid var(--border-muted);
+    margin-bottom: 18px;
+  }
+  .prob-row {
+    display: grid;
+    grid-template-columns: 68px 86px 1fr 64px;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border-muted);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .dir-name {
+    font-weight: 600;
+    color: var(--text);
+  }
+  .dir-name.selected {
+    color: var(--accent);
+  }
+  .dir-safety {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .dir-safety.unsafe {
+    color: var(--danger);
+  }
+  .bar-track {
+    height: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border-muted);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--muted);
+    transition: width 120ms ease, background-color 120ms ease;
+  }
+  .bar-fill.selected {
+    background: var(--accent);
+  }
+  .bar-fill.unsafe-pick {
+    background: var(--danger);
+  }
+  .prob-val {
+    text-align: right;
+    color: var(--text);
+  }
+  .feature-line {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    padding: 8px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-variant-numeric: tabular-nums;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .status-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    margin-right: 6px;
+  }
+  .status-dot.live { background: var(--ok); }
+  .status-dot.warn { background: var(--warn); }
+  .status-dot.err { background: var(--danger); }
+  .alert-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    border-radius: 9999px;
+    color: var(--danger);
+    background: var(--danger-subtle);
+    border: 1px solid var(--danger);
+  }
+  details {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    padding: 10px 14px;
+  }
+  details summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text);
+    user-select: none;
+  }
+  pre.payload {
+    margin: 10px 0 0;
+    padding: 10px;
+    background: var(--canvas);
+    border: 1px solid var(--border-muted);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.45;
+    max-height: 260px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header-row">
+    <div>
+      <h1>djev snake</h1>
+      <div class="subtitle">1-step DiffusionGemma choice probabilities over relative board features · POST /v1/systemone</div>
+    </div>
+    <div class="status-banner">
+      <span><span id="dot" class="status-dot"></span><span id="status-text">Idle · ready</span></span>
+      <span id="anomaly-badge" class="alert-badge" hidden>Game Over</span>
+    </div>
+  </div>
+
+  <div class="conn-strip">
+    <label>
+      Endpoint URL
+      <input id="endpoint" type="text" style="width: 340px" placeholder="/v1/systemone or https://...run.app">
+    </label>
+    <label>
+      Bearer Token
+      <input id="token" type="password" style="width: 180px" placeholder="optional API_KEY">
+    </label>
+    <label>
+      Pace
+      <select id="pace">
+        <option value="0">Uncapped (as fast as /v1/systemone replies)</option>
+        <option value="80" selected>12.5 ticks/s (80 ms)</option>
+        <option value="150">6.7 ticks/s (150 ms)</option>
+        <option value="300">3.3 ticks/s (300 ms)</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="controls-bar">
+    <div class="btn-group">
+      <button id="btn-start" class="primary">Start</button>
+      <button id="btn-step">Step</button>
+      <button id="btn-reset">Reset</button>
+    </div>
+    <div class="btn-group">
+      <label class="toggle-label">
+        <input id="chk-mask" type="checkbox" checked>
+        <span>Strict Safe-Move Mask (restrict argmax to safe_moves)</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="board-frame">
+      <canvas id="board" width="360" height="360"></canvas>
+      <div class="board-footer">
+        <span id="coords-text">head [6, 6] · food [9, 3]</span>
+        <span>Space: start/pause · R: reset</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="metrics-strip">
+        <div class="metric-cell">
+          <div class="metric-label">Score</div>
+          <div id="m-score" class="metric-val">0</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-label">Length</div>
+          <div id="m-len" class="metric-val">4</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-label">Steps</div>
+          <div id="m-steps" class="metric-val">0</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-label">Latency</div>
+          <div id="m-ms" class="metric-val">0 ms</div>
+        </div>
+        <div class="metric-cell">
+          <div class="metric-label">Rate · Shield</div>
+          <div id="m-rate" class="metric-val">0.0/s · 0</div>
+        </div>
+      </div>
+
+      <div class="section-title">
+        <span>Direction probabilities (answers.move.probabilities)</span>
+        <span id="chosen-summary" class="sub">choice: right · conf 0.00</span>
+      </div>
+
+      <div class="prob-list" id="prob-list">
+        <div class="prob-row" data-dir="up">
+          <span class="dir-name" id="name-up">up</span>
+          <span class="dir-safety" id="safe-up">safe</span>
+          <div class="bar-track"><div class="bar-fill" id="bar-up"></div></div>
+          <span class="prob-val" id="val-up">25.0%</span>
+        </div>
+        <div class="prob-row" data-dir="down">
+          <span class="dir-name" id="name-down">down</span>
+          <span class="dir-safety" id="safe-down">safe</span>
+          <div class="bar-track"><div class="bar-fill" id="bar-down"></div></div>
+          <span class="prob-val" id="val-down">25.0%</span>
+        </div>
+        <div class="prob-row" data-dir="left">
+          <span class="dir-name" id="name-left">left</span>
+          <span class="dir-safety" id="safe-left">neck</span>
+          <div class="bar-track"><div class="bar-fill" id="bar-left"></div></div>
+          <span class="prob-val" id="val-left">25.0%</span>
+        </div>
+        <div class="prob-row" data-dir="right">
+          <span class="dir-name" id="name-right">right</span>
+          <span class="dir-safety" id="safe-right">safe</span>
+          <div class="bar-track"><div class="bar-fill" id="bar-right"></div></div>
+          <span class="prob-val" id="val-right">25.0%</span>
+        </div>
+      </div>
+
+      <div class="feature-line" id="feature-strip">
+        safe_moves: [up, down, right] · food_delta: dx=+3, dy=-3 (right, up) · open_space: 140
+      </div>
+
+      <details>
+        <summary>▶ Inspect live POST /v1/systemone state and response JSON</summary>
+        <pre class="payload" id="payload-view"></pre>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+const GRID = 12;
+const DIRS = ["up", "down", "left", "right"];
+const VEC = {
+  up: [0, -1],
+  down: [0, 1],
+  left: [-1, 0],
+  right: [1, 0]
+};
+const OPP = { up: "down", down: "up", left: "right", right: "left" };
+
+const QUESTIONS_SCHEMA = {
+  move: {
+    type: "choice",
+    instructions: "Choose the next direction for the snake head. Select a direction in safe_moves that moves toward food (matching food_delta preferred directions and minimal manhattan_to_food) while preserving open_space.",
+    criteria: {
+      up: "Move north (y - 1)",
+      down: "Move south (y + 1)",
+      left: "Move west (x - 1)",
+      right: "Move east (x + 1)"
+    }
+  }
+};
+
+const $ = id => document.getElementById(id);
+
+function defaultEndpoint() {
+  try {
+    const saved = localStorage.getItem("djev_snake_endpoint");
+    if (saved) return saved;
+  } catch (e) {}
+  if (location.protocol === "http:" || location.protocol === "https:") {
+    return "/v1/systemone";
+  }
+  return "https://djev-dgemma-864751976003.us-central1.run.app/v1/systemone";
+}
+
+$("endpoint").value = defaultEndpoint();
+try {
+  $("token").value = localStorage.getItem("djev_api_key") || "";
+} catch (e) {}
+
+$("endpoint").onchange = () => {
+  try { localStorage.setItem("djev_snake_endpoint", $("endpoint").value.trim()); } catch (e) {}
+};
+$("token").onchange = () => {
+  try { localStorage.setItem("djev_api_key", $("token").value.trim()); } catch (e) {}
+};
+
+function resolveEndpointUrl() {
+  let u = $("endpoint").value.trim() || "/v1/systemone";
+  if (u.startsWith("http://") || u.startsWith("https://")) {
+    if (!u.endsWith("/v1/systemone") && !u.endsWith("/v1/evaluate")) {
+      u = u.replace(/\/+$/, "") + "/v1/systemone";
+    }
+  }
+  return u;
+}
+
+let snake = [];
+let direction = "right";
+let food = [9, 3];
+let score = 0;
+let steps = 0;
+let shieldCount = 0;
+let alive = true;
+let running = false;
+let inflight = false;
+let lastMs = 0;
+let recentTicks = [];
+let sandboxFallback = false;
+
+function spawnFood(body) {
+  const occupied = new Set(body.map(([x, y]) => x + "," + y));
+  const free = [];
+  for (let y = 0; y < GRID; y++) {
+    for (let x = 0; x < GRID; x++) {
+      if (!occupied.has(x + "," + y)) free.push([x, y]);
+    }
+  }
+  if (!free.length) return [0, 0];
+  const idx = (steps * 17 + score * 31 + 7) % free.length;
+  return free[idx];
+}
+
+function resetGame() {
+  running = false;
+  $("btn-start").textContent = "Start";
+  snake = [[5, 6], [4, 6], [3, 6], [2, 6]];
+  direction = "right";
+  score = 0;
+  steps = 0;
+  shieldCount = 0;
+  alive = true;
+  lastMs = 0;
+  recentTicks = [];
+  food = spawnFood(snake);
+  $("anomaly-badge").hidden = true;
+  setStatus("Idle · ready", "");
+  const st = buildState();
+  updateUI(st, { up: 0.25, down: 0.25, left: 0.0, right: 0.50 }, "right", "right", 0);
+  drawBoard();
+}
+
+function floodFillCount(startX, startY, bodySet) {
+  const startKey = startX + "," + startY;
+  if (startX < 0 || startX >= GRID || startY < 0 || startY >= GRID || bodySet.has(startKey)) {
+    return 0;
+  }
+  const visited = new Set([startKey]);
+  const queue = [[startX, startY]];
+  while (queue.length > 0) {
+    const [cx, cy] = queue.shift();
+    for (const d of DIRS) {
+      const [vx, vy] = VEC[d];
+      const nx = cx + vx, ny = cy + vy;
+      const k = nx + "," + ny;
+      if (nx >= 0 && nx < GRID && ny >= 0 && ny < GRID && !bodySet.has(k) && !visited.has(k)) {
+        visited.add(k);
+        queue.push([nx, ny]);
+      }
+    }
+  }
+  return visited.size;
+}
+
+function buildState() {
+  const [hx, hy] = snake[0];
+  const [fx, fy] = food;
+  const dx = fx - hx;
+  const dy = fy - hy;
+  // Tail tip moves away unless eating, so exclude final segment from obstacle set
+  const bodyObstacles = new Set(snake.slice(0, -1).map(([x, y]) => x + "," + y));
+  const [nxNeck, nyNeck] = snake[1] || [-1, -1];
+
+  const safeMoves = [];
+  const blockedMoves = {};
+  const moveAnalysis = {};
+
+  for (const d of DIRS) {
+    const [vx, vy] = VEC[d];
+    const tx = hx + vx;
+    const ty = hy + vy;
+    let reason = "safe";
+    if (tx === nxNeck && ty === nyNeck) {
+      reason = "neck";
+    } else if (tx < 0 || tx >= GRID || ty < 0 || ty >= GRID) {
+      reason = "wall";
+    } else if (bodyObstacles.has(tx + "," + ty)) {
+      reason = "body";
+    }
+    const isSafe = reason === "safe";
+    const dist = Math.abs(fx - tx) + Math.abs(fy - ty);
+    const space = isSafe ? floodFillCount(tx, ty, bodyObstacles) : 0;
+    if (isSafe) {
+      safeMoves.push(d);
+    } else {
+      blockedMoves[d] = reason;
+    }
+    moveAnalysis[d] = {
+      safe: isSafe,
+      reason,
+      manhattan_to_food: dist,
+      open_space: space,
+      reduces_distance: dist < (Math.abs(dx) + Math.abs(dy))
+    };
+  }
+
+  let bestMove = safeMoves[0] || direction;
+  let bestScore = -1e9;
+  for (const d of safeMoves) {
+    const info = moveAnalysis[d];
+    const s = info.open_space * 2 - info.manhattan_to_food * 5 + (d === direction ? 0.5 : 0);
+    if (s > bestScore) {
+      bestScore = s;
+      bestMove = d;
+    }
+  }
+
+  return {
+    board: `${GRID}x${GRID}`,
+    head: [hx, hy],
+    direction,
+    length: snake.length,
+    score,
+    food: [fx, fy],
+    food_delta: {
+      dx,
+      dy,
+      manhattan: Math.abs(dx) + Math.abs(dy),
+      preferred_horizontal: dx > 0 ? "right" : (dx < 0 ? "left" : "aligned"),
+      preferred_vertical: dy > 0 ? "down" : (dy < 0 ? "up" : "aligned")
+    },
+    safe_moves: safeMoves,
+    blocked_moves: blockedMoves,
+    move_analysis: moveAnalysis,
+    recommended_safe_move: bestMove
+  };
+}
+
+function simulateSystemOne(state) {
+  // Calibrated fallback when running inside Artifax's connect-src 'none' iframe sandbox
+  const logits = {};
+  for (const d of DIRS) {
+    const info = state.move_analysis[d];
+    if (!info.safe) {
+      logits[d] = -4.2;
+    } else {
+      let l = 1.2;
+      if (info.reduces_distance) l += 1.6;
+      l += Math.min(info.open_space, 60) * 0.025;
+      if (d === state.recommended_safe_move) l += 0.9;
+      logits[d] = l;
+    }
+  }
+  const mx = Math.max(...Object.values(logits));
+  const exps = {};
+  let sum = 0;
+  for (const d of DIRS) {
+    exps[d] = Math.exp(logits[d] - mx);
+    sum += exps[d];
+  }
+  const probs = {};
+  let bestDir = "right", bestP = -1;
+  for (const d of DIRS) {
+    probs[d] = exps[d] / sum;
+    if (probs[d] > bestP) {
+      bestP = probs[d];
+      bestDir = d;
+    }
+  }
+  return {
+    model: "dgemma-sandbox-sim",
+    answers: {
+      move: {
+        type: "choice",
+        choice: bestDir,
+        probabilities: probs,
+        confidence: bestP
+      }
+    },
+    diagnostics: {
+      mode: "artifax_sandbox_fallback",
+      timing: { reads: 1, total_ms: 14.2 }
+    }
+  };
+}
+
+async function requestDecision(state) {
+  const reqBody = {
+    model: "jev-latest",
+    samples: 1,
+    steps: 1,
+    seed: 42 + steps,
+    state,
+    questions: QUESTIONS_SCHEMA
+  };
+  const headers = { "content-type": "application/json" };
+  const tok = $("token").value.trim();
+  if (tok) headers["authorization"] = "Bearer " + tok;
+
+  const t0 = performance.now();
+  try {
+    const resp = await fetch(resolveEndpointUrl(), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(reqBody)
+    });
+    const ms = Math.round(performance.now() - t0);
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error((data.error && data.error.message) || ("HTTP " + resp.status));
+    }
+    sandboxFallback = false;
+    return { reqBody, data, ms };
+  } catch (err) {
+    // In Artifax iframe (opaque origin with connect-src 'none') or offline preview,
+    // gracefully fall back so the interactive board remains playable.
+    const ms = Math.max(8, Math.round(performance.now() - t0));
+    sandboxFallback = true;
+    const data = simulateSystemOne(state);
+    data._network_note = String(err.message || err);
+    return { reqBody, data, ms };
+  }
+}
+
+function applyMove(chosenDir) {
+  const [hx, hy] = snake[0];
+  const [vx, vy] = VEC[chosenDir];
+  const nx = hx + vx;
+  const ny = hy + vy;
+  const bodyObstacles = new Set(snake.slice(0, -1).map(([x, y]) => x + "," + y));
+
+  if (nx < 0 || nx >= GRID || ny < 0 || ny >= GRID || bodyObstacles.has(nx + "," + ny)) {
+    alive = false;
+    running = false;
+    $("btn-start").textContent = "Start";
+    $("anomaly-badge").hidden = false;
+    $("anomaly-badge").textContent = `Collision (${chosenDir})`;
+    setStatus(`Stopped · collision on ${chosenDir}`, "err");
+    drawBoard();
+    return;
+  }
+
+  snake.unshift([nx, ny]);
+  direction = chosenDir;
+  if (nx === food[0] && ny === food[1]) {
+    score += 1;
+    food = spawnFood(snake);
+  } else {
+    snake.pop();
+  }
+  steps += 1;
+}
+
+function setStatus(text, kind) {
+  $("status-text").textContent = text;
+  const dot = $("dot");
+  dot.className = "status-dot" + (kind ? " " + kind : "");
+}
+
+function updateUI(state, probs, rawChoice, finalChoice, ms) {
+  $("m-score").textContent = String(score);
+  $("m-len").textContent = String(snake.length);
+  $("m-steps").textContent = String(steps);
+  $("m-ms").textContent = `${ms} ms`;
+
+  const now = performance.now();
+  if (ms > 0) {
+    recentTicks.push(now);
+    while (recentTicks.length > 1 && now - recentTicks[0] > 3000) {
+      recentTicks.shift();
+    }
+  }
+  const rate = recentTicks.length > 1
+    ? ((recentTicks.length - 1) * 1000 / (now - recentTicks[0])).toFixed(1)
+    : "0.0";
+  $("m-rate").textContent = `${rate}/s · ${shieldCount}`;
+
+  const [hx, hy] = state.head;
+  const [fx, fy] = state.food;
+  $("coords-text").textContent = `head [${hx}, ${hy}] · food [${fx}, ${fy}]`;
+
+  const conf = (probs[finalChoice] || 0).toFixed(2);
+  const maskedNote = rawChoice !== finalChoice ? ` (masked from ${rawChoice})` : "";
+  $("chosen-summary").textContent = `choice: ${finalChoice}${maskedNote} · p=${conf}`;
+
+  for (const d of DIRS) {
+    const p = Math.max(0, Math.min(1, Number(probs[d] || 0)));
+    const pct = (p * 100).toFixed(1) + "%";
+    const info = state.move_analysis[d];
+    const isSelected = d === finalChoice;
+
+    $("name-" + d).className = "dir-name" + (isSelected ? " selected" : "");
+    const safeEl = $("safe-" + d);
+    safeEl.textContent = info.safe ? `safe · d=${info.manhattan_to_food}` : info.reason;
+    safeEl.className = "dir-safety" + (info.safe ? "" : " unsafe");
+
+    const barEl = $("bar-" + d);
+    barEl.style.width = (p * 100).toFixed(1) + "%";
+    barEl.className = "bar-fill" + (isSelected ? (info.safe ? " selected" : " unsafe-pick") : "");
+    $("val-" + d).textContent = pct;
+  }
+
+  const fd = state.food_delta;
+  $("feature-strip").textContent =
+    `safe_moves: [${state.safe_moves.join(", ")}] · food_delta: dx=${fd.dx >= 0 ? "+" + fd.dx : fd.dx}, dy=${fd.dy >= 0 ? "+" + fd.dy : fd.dy} (${fd.preferred_horizontal}, ${fd.preferred_vertical})`;
+}
+
+function drawBoard() {
+  const canvas = $("board");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width;
+  const H = canvas.height;
+  const cell = W / GRID;
+  const styles = getComputedStyle(document.documentElement);
+  const bg = styles.getPropertyValue("--grid-bg").trim() || "#0d1117";
+  const line = styles.getPropertyValue("--grid-line").trim() || "#161b22";
+  const headCol = styles.getPropertyValue("--snake-head").trim() || "#2f81f7";
+  const bodyCol = styles.getPropertyValue("--snake-body").trim() || "#1f6feb";
+  const foodCol = styles.getPropertyValue("--food-fill").trim() || "#3fb950";
+
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = line;
+  ctx.lineWidth = 1;
+  for (let i = 1; i < GRID; i++) {
+    const pos = Math.floor(i * cell) + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(pos, 0);
+    ctx.lineTo(pos, H);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, pos);
+    ctx.lineTo(W, pos);
+    ctx.stroke();
+  }
+
+  // Draw food
+  const [fx, fy] = food;
+  ctx.fillStyle = foodCol;
+  const padF = cell * 0.18;
+  ctx.beginPath();
+  ctx.roundRect(fx * cell + padF, fy * cell + padF, cell - padF * 2, cell - padF * 2, 5);
+  ctx.fill();
+
+  // Draw snake segments
+  for (let i = snake.length - 1; i >= 0; i--) {
+    const [sx, sy] = snake[i];
+    const isHead = i === 0;
+    ctx.fillStyle = isHead ? headCol : bodyCol;
+    ctx.globalAlpha = isHead ? 1.0 : Math.max(0.45, 0.92 - (i / (snake.length + 4)) * 0.45);
+    const pad = isHead ? cell * 0.08 : cell * 0.14;
+    ctx.beginPath();
+    ctx.roundRect(sx * cell + pad, sy * cell + pad, cell - pad * 2, cell - pad * 2, isHead ? 6 : 4);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1.0;
+}
+
+async function stepOnce() {
+  if (inflight || !alive) return;
+  inflight = true;
+  const state = buildState();
+  const { reqBody, data, ms } = await requestDecision(state);
+  lastMs = ms;
+  const moveAns = (data.answers && data.answers.move) || {};
+  const probs = moveAns.probabilities || { up: 0.25, down: 0.25, left: 0.25, right: 0.25 };
+  const rawChoice = moveAns.choice || DIRS.reduce((a, b) => (probs[a] >= probs[b] ? a : b));
+
+  let finalChoice = rawChoice;
+  if ($("chk-mask").checked && state.safe_moves.length > 0) {
+    if (!state.safe_moves.includes(rawChoice)) {
+      shieldCount += 1;
+      finalChoice = state.safe_moves.reduce((a, b) => ((probs[a] || 0) >= (probs[b] || 0) ? a : b));
+    }
+  }
+
+  $("payload-view").textContent = JSON.stringify(
+    { request: reqBody, response: data },
+    null,
+    2
+  );
+
+  applyMove(finalChoice);
+  if (alive) {
+    if (sandboxFallback) {
+      setStatus(`Simulating /v1/systemone (sandbox/offline fallback) · ${ms} ms`, "warn");
+    } else {
+      setStatus(`Live /v1/systemone (${data.model || "dgemma"}) · ${ms} ms`, "live");
+    }
+  }
+  updateUI(state, probs, rawChoice, finalChoice, ms);
+  drawBoard();
+  inflight = false;
+}
+
+async function loop() {
+  while (running && alive) {
+    const tStart = performance.now();
+    await stepOnce();
+    if (!running || !alive) break;
+    const targetPace = parseInt($("pace").value, 10) || 0;
+    const elapsed = performance.now() - tStart;
+    const wait = Math.max(16, targetPace - elapsed);
+    await new Promise(r => setTimeout(r, wait));
+  }
+}
+
+$("btn-start").onclick = () => {
+  if (!alive) resetGame();
+  running = !running;
+  $("btn-start").textContent = running ? "Pause" : "Start";
+  if (running) {
+    loop();
+  } else {
+    setStatus("Paused", "");
+  }
+};
+
+$("btn-step").onclick = async () => {
+  if (!alive) resetGame();
+  running = false;
+  $("btn-start").textContent = "Start";
+  await stepOnce();
+};
+
+$("btn-reset").onclick = () => resetGame();
+
+window.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.code === "Space") {
+    e.preventDefault();
+    $("btn-start").click();
+  } else if (e.key === "r" || e.key === "R") {
+    e.preventDefault();
+    resetGame();
+  }
+});
+
+new MutationObserver(() => drawBoard()).observe(document.documentElement, {
+  attributes: true,
+  attributeFilter: ["class"]
+});
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => drawBoard());
+
+resetGame();
+</script>
+</body>
+</html>

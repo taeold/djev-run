@@ -1,8 +1,6 @@
 name: Build and Push Container Image
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -16,10 +14,12 @@ jobs:
       - name: Free runner disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h
+          sudo docker image prune --all --force
 
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Clone mmastrac/djev-spark
+        run: |
+          git clone --depth=1 https://github.com/mmastrac/djev-spark.git djev-spark
+          sed -i 's|^PORT=${PORT:-8010}|STRUCTURED_PORT=${STRUCTURED_PORT:-${PORT:-8080}}\nPORT=8010\nif [[ "${COPY_TO_SHM:-1}" == "1" \&\& -d "/mnt/gcs/dgemma" \&\& -f "/mnt/gcs/dgemma/config.json" ]]; then mkdir -p /dev/shm/dgemma \&\& find /mnt/gcs/dgemma -maxdepth 1 -type f \| xargs -P 16 -I {} cp -f {} /dev/shm/dgemma/ \&\& MODEL=/dev/shm/dgemma; fi|' djev-spark/entrypoint.sh
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -31,6 +31,7 @@ jobs:
       - name: Build and push ghcr.io/taeold/djev-run:latest
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./djev-spark
+          platforms: linux/amd64
           push: true
           tags: ghcr.io/taeold/djev-run:latest
