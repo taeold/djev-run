@@ -57,6 +57,7 @@ jobs:
           PORT="${PORT:-8080}"
           ENFORCE_EAGER="${ENFORCE_EAGER:-1}"
           DISABLE_MM="${DISABLE_MM:-1}"
+          export VLLM_ENABLE_V1_MULTIPROCESSING="${VLLM_ENABLE_V1_MULTIPROCESSING:-0}"
           EXTRA_ARGS="${EXTRA_ARGS:-}"
           JIT_CACHE_ARCHIVE="/mnt/gcs/jit-cache/rtx-pro-6000-cache.tar.gz"
           mkdir -p /root/.cache/flashinfer /root/.triton /root/.cache/vllm
@@ -70,6 +71,7 @@ jobs:
           fi
           VLLM_EXTRA_ARGS=()
           if [ "$ENFORCE_EAGER" = "1" ]; then
+            export TORCH_COMPILE_DISABLE="${TORCH_COMPILE_DISABLE:-1}"
             VLLM_EXTRA_ARGS+=(--enforce-eager)
           fi
           if [ "$DISABLE_MM" = "1" ]; then
@@ -88,12 +90,27 @@ jobs:
           for i in $(seq 1 450); do
             kill -0 "$VLLM_PID" 2>/dev/null || exit 1
             curl -sf http://127.0.0.1:8000/health >/dev/null 2>&1 && break
-            sleep 2
+            sleep 1
           done
           exec python3 /opt/dgemma/structured_server.py --upstream http://127.0.0.1:8000 --model dgemma --tokenizer "$MODEL" --canvas "$CANVAS" --host 0.0.0.0 --port "$PORT"
           EOF
           cat > djev-spark/Dockerfile.cloudrun << 'EOF'
           FROM ghcr.io/taeold/djev-run:latest
+          RUN python3 -c '
+          import pathlib
+          p = pathlib.Path("/usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_worker.py")
+          s = p.read_text()
+          s = s.replace(
+              "        if kv_cache_memory_bytes := self.cache_config.kv_cache_memory_bytes:\n"
+              "            # still need a profile run which compiles the model for\n"
+              "            # max_num_batched_tokens\n"
+              "            self.model_runner.profile_run()",
+              "        if kv_cache_memory_bytes := self.cache_config.kv_cache_memory_bytes:\n"
+              "            if not self.model_config.enforce_eager:\n"
+              "                self.model_runner.profile_run()"
+          )
+          p.write_text(s)
+          '
           COPY server/structured_server.py server/snake.html server/playground.html server/walk.html server/cube.html server/test_structured_server.py /opt/dgemma/
           COPY entrypoint.sh /entrypoint.sh
           RUN chmod +x /entrypoint.sh && python3 -m py_compile /opt/dgemma/structured_server.py
