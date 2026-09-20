@@ -7,6 +7,78 @@ with an NVIDIA RTX PRO 6000 Blackwell GPU. Built on
 Snake demo inspired by
 [`mizorewww/laya-coreml`](https://github.com/mizorewww/laya-coreml).
 
+--------------------------------------------------------------------------------
+
+## Deploy on Google Cloud Run
+
+Follows
+[Cloud Run GPU best practices](https://docs.cloud.google.com/run/docs/configuring/services/gpu-best-practices).
+
+### Step 1: Upload Model to GCS
+
+```bash
+export BUCKET="your-gcs-bucket"
+export REGION="us-central1" # Supported RTX PRO 6000 regions: us-central1, europe-west4, asia-southeast1, asia-south2
+
+gcloud storage buckets create "gs://${BUCKET}" --location="${REGION}"
+hf download nvidia/diffusiongemma-26B-A4B-it-NVFP4 --local-dir /tmp/dgemma
+gcloud storage cp -r /tmp/dgemma/* "gs://${BUCKET}/dgemma/"
+```
+
+### Step 2: Deploy to Cloud Run
+
+```bash
+gcloud beta run deploy djev-dgemma \
+  --region="${REGION}" \
+  --image=ghcr.io/taeold/djev-run:latest \
+  --gpu=1 \
+  --gpu-type=nvidia-rtx-pro-6000 \
+  --no-gpu-zonal-redundancy \
+  --cpu=20 \
+  --memory=80Gi \
+  --no-cpu-throttling \
+  --concurrency=32 \
+  --min-instances=0 \
+  --max-instances=1 \
+  --port=8080 \
+  --network=default \
+  --subnet=default \
+  --vpc-egress=all-traffic \
+  --add-volume=name=weights,type=cloud-storage,bucket="${BUCKET}",readonly=false,mount-options=enable-buffered-read=true \
+  --add-volume-mount=volume=weights,mount-path=/mnt/gcs \
+  --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=5,periodSeconds=2,timeoutSeconds=2,failureThreshold=120 \
+  --set-env-vars="MODEL=/mnt/gcs/dgemma,CANVAS=128,MAX_SEQS=32,MAX_MODEL_LEN=4096,GPU_UTIL=0.40,KV_CACHE_GB=2,ATTN=TRITON_ATTN,COPY_TO_SHM=1,ENFORCE_EAGER=1,DISABLE_MM=1,TORCH_COMPILE_DISABLE=1,VLLM_WORKER_MULTIPROC_METHOD=fork,VLLM_UF_EAGER_ALL=1,VLLM_FLASHINFER_MOE_BACKEND=masked_gemm,CUDA_MODULE_LOADING=LAZY"
+
+# --image=ghcr.io/taeold/djev-run:latest: prebuilt from github.com/mmastrac/djev-spark (upstream does not publish a registry image)
+# --no-gpu-zonal-redundancy: required for standard regional RTX PRO 6000 quota
+# --no-cpu-throttling: keeps all 20 vCPUs active during weight loading and vLLM scheduling
+# --network=default --subnet=default --vpc-egress=all-traffic: streams weights from GCS over Google internal networking (~1.05 GiB/s)
+# mount-options=enable-buffered-read=true: prefetches 18 GB safetensors shards sequentially from GCS
+# COPY_TO_SHM=1: stages the 17.5 GB model into /dev/shm RAM in the background while Python imports torch/vllm
+# VLLM_WORKER_MULTIPROC_METHOD=fork: forks EngineCore from APIServer without re-importing Python
+# ENFORCE_EAGER=1 & TORCH_COMPILE_DISABLE=1: skips torch.compile, CUDA graph capture, and redundant startup profiling
+# DISABLE_MM=1: skips SigLIP vision/video encoder profiling for text-only evaluation
+```
+
+### Step 3: Play the Built-in Snake Demo (Zero Dependencies)
+
+`snake.html` is a standalone HTML file with zero dependencies (no Node.js,
+`npm`, or AI SDK required). It calls `POST /v1/systemone` directly from the
+browser via `fetch()` at ~15 moves/sec:
+
+-   **Hosted on Cloud Run**: Open `https://<your-cloud-run-url>/snake` in your
+    browser.
+-   **Local file**: Open `snake.html` directly in a browser and set
+    `CLOUD_RUN_URL` at the top of `<script>`.
+
+--------------------------------------------------------------------------------
+
+## Use with Vercel AI SDK (Optional)
+
+Because `djev-spark` implements the `/v1/systemone` endpoint contract, you can
+also point `@ai-sdk/typesafe-ai` at your Cloud Run URL from Node.js or
+TypeScript (`index.ts`):
+
 ```typescript
 import { createTypeSafeAi } from '@ai-sdk/typesafe-ai';
 import { experimental_evaluate, type Experimental_EvaluationModel } from 'ai';
@@ -64,68 +136,10 @@ console.log(result);
 // }
 ```
 
---------------------------------------------------------------------------------
-
-## Deploy on Google Cloud Run
-
-Follows
-[Cloud Run GPU best practices](https://docs.cloud.google.com/run/docs/configuring/services/gpu-best-practices).
-
-### Step 1: Upload Model to GCS
-
-```bash
-export BUCKET="your-gcs-bucket"
-export REGION="us-central1" # Supported RTX PRO 6000 regions: us-central1, europe-west4, asia-southeast1, asia-south2
-
-gcloud storage buckets create "gs://${BUCKET}" --location="${REGION}"
-hf download nvidia/diffusiongemma-26B-A4B-it-NVFP4 --local-dir /tmp/dgemma
-gcloud storage cp -r /tmp/dgemma/* "gs://${BUCKET}/dgemma/"
-```
-
-### Step 2: Deploy to Cloud Run
-
-```bash
-gcloud beta run deploy djev-dgemma \
-  --region="${REGION}" \
-  --image=ghcr.io/taeold/djev-run:latest \
-  --gpu=1 \
-  --gpu-type=nvidia-rtx-pro-6000 \
-  --no-gpu-zonal-redundancy \
-  --cpu=20 \
-  --memory=80Gi \
-  --no-cpu-throttling \
-  --concurrency=32 \
-  --min-instances=0 \
-  --max-instances=1 \
-  --port=8080 \
-  --network=default \
-  --subnet=default \
-  --vpc-egress=all-traffic \
-  --add-volume=name=weights,type=cloud-storage,bucket="${BUCKET}",readonly=false,mount-options=enable-buffered-read=true \
-  --add-volume-mount=volume=weights,mount-path=/mnt/gcs \
-  --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=5,periodSeconds=2,timeoutSeconds=2,failureThreshold=120 \
-  --set-env-vars="MODEL=/mnt/gcs/dgemma,CANVAS=128,MAX_SEQS=32,MAX_MODEL_LEN=4096,GPU_UTIL=0.40,KV_CACHE_GB=2,ATTN=TRITON_ATTN,COPY_TO_SHM=1,ENFORCE_EAGER=1,DISABLE_MM=1,TORCH_COMPILE_DISABLE=1,VLLM_WORKER_MULTIPROC_METHOD=fork,VLLM_UF_EAGER_ALL=1,VLLM_FLASHINFER_MOE_BACKEND=masked_gemm,CUDA_MODULE_LOADING=LAZY"
-
-# --image=ghcr.io/taeold/djev-run:latest: prebuilt from github.com/mmastrac/djev-spark (upstream does not publish a registry image)
-# --no-gpu-zonal-redundancy: required for standard regional RTX PRO 6000 quota
-# --no-cpu-throttling: keeps all 20 vCPUs active during weight loading and vLLM scheduling
-# --network=default --subnet=default --vpc-egress=all-traffic: streams weights from GCS over Google internal networking (~1.05 GiB/s)
-# mount-options=enable-buffered-read=true: prefetches 18 GB safetensors shards sequentially from GCS
-# COPY_TO_SHM=1: stages the 17.5 GB model into /dev/shm RAM in the background while Python imports torch/vllm
-# VLLM_WORKER_MULTIPROC_METHOD=fork: forks EngineCore from APIServer without re-importing Python
-# ENFORCE_EAGER=1 & TORCH_COMPILE_DISABLE=1: skips torch.compile, CUDA graph capture, and redundant startup profiling
-# DISABLE_MM=1: skips SigLIP vision/video encoder profiling for text-only evaluation
-```
-
-### Run the Sample Code & Snake Demo
-
 ```bash
 npm install
-DJEV_BASE_URL="https://<your-cloud-run-url>/v1" TYPESAFE_AI_API_KEY="$(gcloud auth print-identity-token)" npm start
+CLOUD_RUN_URL="https://<your-cloud-run-url>" TYPESAFE_AI_API_KEY="$(gcloud auth print-identity-token)" npm start
 ```
-
-Once deployed, open `https://<your-cloud-run-url>/snake` (or `snake.html`
-locally) to play a live Snake game driven by `/v1/systemone` at ~15 moves/sec.
 
 --------------------------------------------------------------------------------
 
