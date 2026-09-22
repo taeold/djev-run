@@ -148,18 +148,22 @@ CLOUD_RUN_URL="https://<your-cloud-run-url>" TYPESAFE_AI_API_KEY="$(gcloud auth 
 
 ## Performance
 
--   **Cold start from zero instances**: **~53s** (down from `4m 05s` baseline)
+-   **Cold start from zero instances**: **~47.5s** (down from `4m 05s` baseline)
 -   **Single-request latency**: **~35-60 ms** (`steps=1, samples=1`; **~160 ms**
     with `samples="auto"`)
 -   **Batch throughput**: **~100-123 requests/sec** at `concurrency=32`
 
-To reach a 53-second cold start on Cloud Run, the container streams the 17.5 GB
+To reach a 47.5-second cold start on Cloud Run, the container streams the 17.5 GB
 `safetensors` weights from GCS into `/dev/shm` RAM in the background (`1.05
 GiB/s`) while Python imports `torch` and `vllm`, forks `EngineCore` from
 `APIServer` (`VLLM_WORKER_MULTIPROC_METHOD=fork`) so modules are not imported
 twice, disables unused SigLIP vision profiling (`DISABLE_MM=1`), and skips
 `torch.compile`, CUDA graph capture, and redundant memory-profiling passes
 (`ENFORCE_EAGER=1`, `TORCH_COMPILE_DISABLE=1`, `--kv-cache-memory`).
+
+Empirical benchmarks on Cloud Run with the RTX PRO 6000 confirmed:
+- Streaming over VPC egress from GCS FUSE into `/dev/shm` (~47.5s) outperforms baking weights into the container image (80-115s), avoiding heavy overlay filesystem read overhead and long image import operations.
+- `--cpu-boost` is omitted because host CPU frequency scaling under boosted allocation slows down 20 vCPU container initialization on GPU nodes (73-75s vs 47.5s).
 
 --------------------------------------------------------------------------------
 
