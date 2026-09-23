@@ -12,6 +12,9 @@ Built-in demo apps, inspired by:
 
 <img width="640" height="360" alt="djev snake" src="https://github.com/user-attachments/assets/2e9a5321-f8a9-4734-b6f2-4d6f47193390" />
 
+<img width="640" height="360" alt="djev tetris" src="https://github.com/user-attachments/assets/664f12cc-be17-4181-8a9a-5106e64c2f61" />
+
+
 --------------------------------------------------------------------------------
 
 ## Deploy on Google Cloud Run
