@@ -3,8 +3,19 @@ set -euo pipefail
 
 echo "[ultra-fast-init] Starting at $(date -u +%Y-%m-%dT%H:%M:%S.%6NZ)"
 
+PY_BIN="python3"
+if command -v python3.12 >/dev/null 2>&1; then
+  PY_BIN="python3.12"
+fi
+SITE_PKG="/usr/local/lib/python3.12/dist-packages"
+NV_LIBS=$(find "$SITE_PKG/nvidia" -maxdepth 2 -type d -name "lib" 2>/dev/null | tr '\n' ':' || true)
+export LD_LIBRARY_PATH="/usr/local/cuda-13.0/compat:/usr/local/cuda-13.0/targets/x86_64-linux/lib:${SITE_PKG}/torch/lib:${NV_LIBS}${LD_LIBRARY_PATH:-}"
+export PYTHONPATH="${SITE_PKG}:/opt/dgemma:${PYTHONPATH:-}"
+
 # 1. Stage small config/tokenizer/processor files immediately
-mkdir -p /dev/shm/dgemma
+if [ ! -L /dev/shm/dgemma ]; then
+  mkdir -p /dev/shm/dgemma
+fi
 for f in chat_template.jinja config.json generation_config.json hf_quant_config.json model.safetensors.index.json processor_config.json preprocessor_config.json tokenizer.json tokenizer_config.json; do
   if [ -f "/mnt/gcs/dgemma/$f" ]; then
     cp -f "/mnt/gcs/dgemma/$f" "/dev/shm/dgemma/$f" &
@@ -24,7 +35,7 @@ fi
 if [ -d "/opt/dgemma/vllm_overlay" ]; then
   cp -rf /opt/dgemma/vllm_overlay/* /usr/local/lib/python3.12/dist-packages/vllm/
 fi
-python3 -m compileall -f -q \
+"$PY_BIN" -m compileall -f -q \
   /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/diffusion_gemma.py \
   /usr/local/lib/python3.12/dist-packages/vllm/v1/sample/ops/diffusion_sampler.py \
   /usr/local/lib/python3.12/dist-packages/vllm/utils/diffusion.py \
@@ -298,11 +309,25 @@ low_vram = gpu_vram_gib < 20.0
 dtype = os.environ.get("DTYPE", "float16" if gpu_cap[0] < 8 else "auto")
 cpu_offload_gb = float(os.environ.get("CPU_OFFLOAD_GB", "5.0" if low_vram else "0.0"))
 disable_mm = os.environ.get("DISABLE_MM", "1") == "1"
-kv_cache_gb = float(os.environ.get("KV_CACHE_GB", "0.5" if low_vram else "2.0"))
+default_kv_gb = "0.5" if low_vram else ("1.5" if gpu_vram_gib < 30.0 else "2.0")
+kv_cache_gb = float(os.environ.get("KV_CACHE_GB", default_kv_gb))
+default_gpu_util = "0.85" if low_vram else ("0.90" if gpu_vram_gib < 30.0 else ("0.85" if gpu_vram_gib < 60.0 else "0.40"))
+gpu_util = float(os.environ.get("GPU_UTIL", default_gpu_util))
+if torch.cuda.is_available():
+    free_b, total_b = torch.cuda.mem_get_info(0)
+    max_safe_util = round((free_b / total_b) * 0.94, 3)
+    if gpu_util > max_safe_util:
+        gpu_util = max_safe_util
+    # Ensure gpu_util budget comfortably covers model weights + kv_cache_gb
+    min_needed_gib = (17.55 - cpu_offload_gb) + kv_cache_gb + 0.8
+    if gpu_util * gpu_vram_gib < min_needed_gib and max_safe_util * gpu_vram_gib >= min_needed_gib:
+        gpu_util = min(max_safe_util, round((min_needed_gib + 0.5) / gpu_vram_gib, 3))
+    if (17.55 - cpu_offload_gb) + kv_cache_gb > gpu_util * gpu_vram_gib - 0.6:
+        kv_cache_gb = max(0.5, round(gpu_util * gpu_vram_gib - (17.55 - cpu_offload_gb) - 0.8, 2))
 print(
     f"[ultra-fast-init] Initializing in-process vLLM LLM engine "
     f"(vram={gpu_vram_gib:.1f}GiB, sm={gpu_cap[0]}.{gpu_cap[1]}, dtype={dtype}, "
-    f"cpu_offload_gb={cpu_offload_gb}, disable_mm={disable_mm}) at t={time.time() - T_BOOT:.2f}s...",
+    f"gpu_util={gpu_util}, kv_cache_gb={kv_cache_gb}, cpu_offload_gb={cpu_offload_gb}, disable_mm={disable_mm}) at t={time.time() - T_BOOT:.2f}s...",
     flush=True,
 )
 LLM_ENGINE = LLM(
@@ -315,7 +340,7 @@ LLM_ENGINE = LLM(
     max_model_len=int(os.environ.get("MAX_MODEL_LEN", "4096")),
     max_num_batched_tokens=4096,
     attention_backend=os.environ.get("ATTN", "TRITON_ATTN"),
-    gpu_memory_utilization=float(os.environ.get("GPU_UTIL", "0.85" if low_vram else "0.40")),
+    gpu_memory_utilization=gpu_util,
     kv_cache_memory_bytes=int(kv_cache_gb * 1073741824),
     max_logprobs=128,
     enable_prefix_caching=True,
@@ -341,4 +366,4 @@ while True:
     time.sleep(3600)
 PYEOF
 
-exec python3 /tmp/run_inproc_server.py
+exec "$PY_BIN" /tmp/run_inproc_server.py
