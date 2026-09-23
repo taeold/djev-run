@@ -350,18 +350,32 @@ def inproc_upstream_chat(body, timeout=600):
 S.upstream_completions = inproc_upstream_completions
 S.upstream_chat = inproc_upstream_chat
 
-disable_mm = os.environ.get("DISABLE_MM", "0") == "1"
-print(f"[ultra-fast-init] Initializing in-process vLLM LLM engine (disable_mm={disable_mm}) at t={time.time() - T_BOOT:.2f}s...", flush=True)
+import torch
+gpu_vram_gib = torch.cuda.get_device_properties(0).total_memory / (1024**3) if torch.cuda.is_available() else 24.0
+gpu_cap = torch.cuda.get_device_capability(0) if torch.cuda.is_available() else (8, 9)
+low_vram = gpu_vram_gib < 20.0
+dtype = os.environ.get("DTYPE", "float16" if gpu_cap[0] < 8 else "auto")
+cpu_offload_gb = float(os.environ.get("CPU_OFFLOAD_GB", "5.0" if low_vram else "0.0"))
+disable_mm = os.environ.get("DISABLE_MM", "1" if low_vram else "0") == "1"
+kv_cache_gb = float(os.environ.get("KV_CACHE_GB", "0.5" if low_vram else "2.0"))
+print(
+    f"[ultra-fast-init] Initializing in-process vLLM LLM engine "
+    f"(vram={gpu_vram_gib:.1f}GiB, sm={gpu_cap[0]}.{gpu_cap[1]}, dtype={dtype}, "
+    f"cpu_offload_gb={cpu_offload_gb}, disable_mm={disable_mm}) at t={time.time() - T_BOOT:.2f}s...",
+    flush=True,
+)
 LLM_ENGINE = LLM(
     model="/dev/shm/dgemma",
+    dtype=dtype,
+    cpu_offload_gb=cpu_offload_gb,
     skip_tokenizer_init=disable_mm,
     trust_remote_code=True,
     max_num_seqs=int(os.environ.get("MAX_SEQS", "32")),
     max_model_len=int(os.environ.get("MAX_MODEL_LEN", "4096")),
     max_num_batched_tokens=4096,
     attention_backend=os.environ.get("ATTN", "TRITON_ATTN"),
-    gpu_memory_utilization=float(os.environ.get("GPU_UTIL", "0.40")),
-    kv_cache_memory_bytes=int(os.environ.get("KV_CACHE_GB", "2")) * 1073741824,
+    gpu_memory_utilization=float(os.environ.get("GPU_UTIL", "0.85" if low_vram else "0.40")),
+    kv_cache_memory_bytes=int(kv_cache_gb * 1073741824),
     max_logprobs=128,
     enable_prefix_caching=True,
     enforce_eager=True,
