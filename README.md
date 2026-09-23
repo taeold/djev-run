@@ -39,6 +39,8 @@ gcloud storage cp -r /tmp/dgemma/* "gs://${BUCKET}/dgemma/"
 
 ### Step 2: Deploy to Cloud Run
 
+Run `./deploy.sh` (`BUCKET=your-gcs-bucket ./deploy.sh`) or execute `gcloud beta run deploy` directly:
+
 ```bash
 gcloud beta run deploy djev-dgemma \
   --region="${REGION}" \
@@ -61,7 +63,7 @@ gcloud beta run deploy djev-dgemma \
   --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=5,periodSeconds=2,timeoutSeconds=2,failureThreshold=120 \
   --set-env-vars="MODEL=/mnt/gcs/dgemma,CANVAS=128,MAX_SEQS=32,MAX_MODEL_LEN=4096,GPU_UTIL=0.40,KV_CACHE_GB=2,ATTN=TRITON_ATTN,TEST_PAGE=1,COPY_TO_SHM=1,ENFORCE_EAGER=1,DISABLE_MM=1,TORCH_COMPILE_DISABLE=1,VLLM_WORKER_MULTIPROC_METHOD=fork,VLLM_UF_EAGER_ALL=1,VLLM_FLASHINFER_MOE_BACKEND=masked_gemm,CUDA_MODULE_LOADING=LAZY"
 
-# --image=ghcr.io/taeold/djev-run:latest: prebuilt from github.com/mmastrac/djev (upstream does not publish a registry image)
+# --image=ghcr.io/taeold/djev-run:latest: prebuilt with entrypoint.sh, structured_server.py, and upstream vLLM block-diffusion (#38250 + #57250)
 # --no-gpu-zonal-redundancy: required for standard regional RTX PRO 6000 quota
 # --no-cpu-throttling: keeps all 20 vCPUs active during weight loading and vLLM scheduling
 # --network=default --subnet=default --vpc-egress=all-traffic: streams weights from GCS over Google internal networking (~1.05 GiB/s)
