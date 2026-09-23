@@ -340,7 +340,7 @@
     <label class="ctrl-label">
       Shield:
       <select id="shieldSelect">
-        <option value="unassisted" selected>unassisted (Raw /v1/systemone)</option>
+        <option value="unassisted" selected>unassisted (Raw /v1/chat/completions)</option>
         <option value="assisted">model + live shield (Planner + Arrival + Emergency)</option>
       </select>
     </label>
@@ -356,7 +356,7 @@
     <label class="ctrl-label">
       <input type="checkbox" id="hitboxToggle" /> Show Hitboxes
     </label>
-    <input id="endpointInput" type="text" value="/v1/systemone" style="width:135px;margin-left:auto;" title="POST /v1/systemone endpoint" />
+    <input id="endpointInput" type="text" value="/v1/chat/completions" style="width:155px;margin-left:auto;" title="POST /v1/chat/completions endpoint" />
   </div>
 
   <div>
@@ -375,7 +375,7 @@
         <div class="event-badge" id="eventBadge"></div>
       </div>
       <details class="payload-drawer">
-        <summary>Inspect Live POST /v1/systemone Request &amp; Response JSON</summary>
+        <summary>Inspect Live POST /v1/chat/completions Request &amp; Response JSON</summary>
         <pre class="payload-pre" id="payloadInspector">Press Start Autopilot (or Space) to stream live decisions from Cloud Run djev-dgemma...</pre>
       </details>
     </div>
@@ -1268,21 +1268,99 @@ Action analysis:
       updatePipeline(plan, game.lastProposed, game.held);
       const t0 = performance.now();
       try {
-        const endpoint = document.getElementById("endpointInput").value.trim() || "/v1/systemone";
-        const resp = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: payload.model,
-            samples: payload.samples,
-            steps: payload.steps,
-            state: payload.state,
-            questions: payload.questions
-          })
-        });
+        if (!window._dinoTokCache) window._dinoTokCache = new Map();
+        async function callDinoDiffusion(reqPayload) {
+          const qs = [];
+          for (const [qid, qspec] of Object.entries(reqPayload.questions || {})) {
+            const crit = qspec.criteria || {};
+            const opts = Array.isArray(crit) ? crit.map(x => [String(x), null]) : Object.entries(crit);
+            const labels = opts.map((_, i) => String.fromCharCode(97 + i));
+            qs.push({ id: qid, type: qspec.type || "choice", instructions: qspec.instructions || "", choices: opts, labels });
+          }
+          let sysText = "Answer a fixed set of questions about the state the user provides. Each question lists its allowed answers; reply with exactly one label per question.\n";
+          for (const q of qs) {
+            sysText += `\nQuestion ${q.id}: ${q.instructions.trim()}\n`;
+            q.choices.forEach(([name, desc], idx) => {
+              sysText += desc ? `  ${q.labels[idx]}: ${name} (${String(desc).trim()})\n` : `  ${q.labels[idx]}: ${name}\n`;
+            });
+          }
+          sysText += '\nReply with one line per question, in this order, formatted as "id: label".';
+          const baseStr = qs.map(q => `${q.id}: ${q.labels[0]}`).join("\n");
+          const altStr = qs.map(q => `${q.id}: ${q.labels[Math.min(1, q.labels.length - 1)]}`).join("\n");
+          let tpl = window._dinoTokCache.get(baseStr);
+          if (!tpl) {
+            const tokRes = await fetch("/tokenize", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ prompts: [baseStr, altStr], add_special_tokens: false })
+            });
+            if (!tokRes.ok) throw new Error(`HTTP ${tokRes.status}`);
+            const tokData = await tokRes.json();
+            const baseToks = tokData.tokens[0], altToks = tokData.tokens[1];
+            const slotPositions = [], pinned = [];
+            for (let i = 0; i < baseToks.length; i++) {
+              if (baseToks[i] !== altToks[i]) slotPositions.push(i);
+              else pinned.push(i);
+            }
+            tpl = { baseToks, slotPositions, pinned };
+            window._dinoTokCache.set(baseStr, tpl);
+          }
+          const seedCanvas = tpl.baseToks.slice();
+          for (const pos of tpl.slotPositions) seedCanvas[pos] = Math.floor(Math.random() * 262144);
+          const chatBody = {
+            model: reqPayload.model || "djev-dgemma",
+            messages: [
+              { role: "system", content: sysText },
+              { role: "user", content: typeof reqPayload.state === "string" ? reqPayload.state : JSON.stringify(reqPayload.state) }
+            ],
+            max_tokens: tpl.baseToks.length + 1,
+            logprobs: true,
+            top_logprobs: 20,
+            extra_body: {
+              vllm_xargs: {
+                diffusion_seed_canvas: seedCanvas,
+                diffusion_pinned: tpl.pinned,
+                diffusion_max_steps: reqPayload.steps || 1,
+                diffusion_read_only: true
+              }
+            }
+          };
+          const endpoint = (document.getElementById("endpointInput").value.trim() || "/v1/chat/completions").replace("/v1/systemone", "/v1/chat/completions");
+          const resp = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(chatBody)
+          });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const data = await resp.json();
+          const content = data.choices?.[0]?.logprobs?.content || [];
+          const answers = {};
+          qs.forEach((q, qi) => {
+            const topList = content[tpl.slotPositions[qi]]?.top_logprobs || [];
+            const lpMap = {};
+            for (const item of topList) {
+              const t = (item.token || "").trim();
+              if (lpMap[t] === undefined || item.logprob > lpMap[t]) lpMap[t] = item.logprob;
+            }
+            const vals = Object.values(lpMap);
+            const floor = (vals.length ? Math.min(...vals) : -20.0) - 5.0;
+            const lpT = q.labels.map(lbl => lpMap[lbl] ?? floor);
+            const mx = Math.max(...lpT);
+            const ex = lpT.map(x => Math.exp(x - mx));
+            const sumEx = ex.reduce((a, b) => a + b, 0) || 1;
+            const probs = ex.map(e => e / sumEx);
+            const pDict = {};
+            let bestIdx = 0;
+            q.choices.forEach(([name], i) => {
+              pDict[name] = probs[i];
+              if (probs[i] > probs[bestIdx]) bestIdx = i;
+            });
+            answers[q.id] = { choice: q.choices[bestIdx][0], probabilities: pDict, confidence: probs[bestIdx] };
+          });
+          return { answers, diagnostics: { timing: { total_ms: data.timing_ms || 0 } }, chat_request: chatBody };
+        }
+        const body = await callDinoDiffusion(payload);
         const elapsed = performance.now() - t0;
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const body = await resp.json();
         if (!running || !game || game.crashed) return;
 
         // Observe timing in frames (exact Pilot.observe_timing from pilot.py)

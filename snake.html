@@ -393,7 +393,7 @@
 
         <div class="panel json-panel">
           <div class="panel-head">
-            <span>Last /v1/systemone Call</span>
+            <span>Last /v1/chat/completions Call</span>
             <span id="coords-text" class="panel-sub">head [5,6] · food [9,3]</span>
           </div>
           <pre id="live-json"></pre>
@@ -433,11 +433,118 @@ const QUESTIONS_SCHEMA = {
 
 const $ = id => document.getElementById(id);
 
-function resolveEndpointUrl() {
+function resolveBaseUrl() {
   if (location.protocol.startsWith("http") && !location.hostname.includes("artifax")) {
-    return "/v1/systemone";
+    return "";
   }
-  return `${CLOUD_RUN_URL.replace(/\/+$/, "")}/v1/systemone`;
+  return CLOUD_RUN_URL.replace(/\/+$/, "");
+}
+
+const _tokCache = new Map();
+async function callDiffusionChatCompletions(payload, baseUrl = "") {
+  const qs = [];
+  for (const [qid, qspec] of Object.entries(payload.questions || {})) {
+    const qtype = qspec.type || "choice";
+    const crit = qspec.criteria;
+    let opts = [], labels = [];
+    if (qtype === "choice") {
+      opts = Array.isArray(crit) ? crit.map(x => [String(x), null]) : Object.entries(crit || {});
+      labels = opts.map((_, i) => String.fromCharCode(97 + i));
+    } else if (qtype === "score") {
+      opts = (crit || []).map(x => [String(x), String(x)]);
+      labels = opts.map((_, i) => String(i + 1));
+    } else {
+      opts = [["yes", null], ["no", null]];
+      labels = ["yes", "no"];
+    }
+    qs.push({ id: qid, type: qtype, instructions: qspec.instructions || "", choices: opts, labels });
+  }
+  let sysText = "Answer a fixed set of questions about the state the user provides. Each question lists its allowed answers; reply with exactly one label per question.\n";
+  for (const q of qs) {
+    sysText += `\nQuestion ${q.id}: ${q.instructions.trim()}\n`;
+    q.choices.forEach(([name, desc], idx) => {
+      const lbl = q.labels[idx];
+      if (q.type === "noul") sysText += `  ${lbl}\n`;
+      else if (desc) sysText += `  ${lbl}: ${name} (${String(desc).trim()})\n`;
+      else sysText += `  ${lbl}: ${name}\n`;
+    });
+  }
+  sysText += '\nReply with one line per question, in this order, formatted as "id: label".';
+  const baseStr = qs.map(q => `${q.id}: ${q.labels[0]}`).join("\n");
+  const altStr = qs.map(q => `${q.id}: ${q.labels[Math.min(1, q.labels.length - 1)]}`).join("\n");
+  const cacheKey = `${baseUrl}|${baseStr}|${altStr}`;
+  let tpl = _tokCache.get(cacheKey);
+  if (!tpl) {
+    const tokRes = await fetch(`${baseUrl}/tokenize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompts: [baseStr, altStr], add_special_tokens: false })
+    });
+    if (!tokRes.ok) throw new Error("HTTP " + tokRes.status);
+    const tokData = await tokRes.json();
+    const baseToks = tokData.tokens[0];
+    const altToks = tokData.tokens[1];
+    const slotPositions = [], pinned = [];
+    for (let i = 0; i < baseToks.length; i++) {
+      if (baseToks[i] !== altToks[i]) slotPositions.push(i);
+      else pinned.push(i);
+    }
+    tpl = { baseToks, slotPositions, pinned };
+    _tokCache.set(cacheKey, tpl);
+  }
+  const seedCanvas = tpl.baseToks.slice();
+  for (const pos of tpl.slotPositions) seedCanvas[pos] = Math.floor(Math.random() * 262144);
+  const chatBody = {
+    model: payload.model || "djev-dgemma",
+    messages: [
+      { role: "system", content: sysText },
+      { role: "user", content: typeof payload.state === "string" ? payload.state : JSON.stringify(payload.state) }
+    ],
+    max_tokens: tpl.baseToks.length + 1,
+    logprobs: true,
+    top_logprobs: 20,
+    extra_body: {
+      vllm_xargs: {
+        diffusion_seed_canvas: seedCanvas,
+        diffusion_pinned: tpl.pinned,
+        diffusion_max_steps: payload.steps || 1,
+        diffusion_read_only: true
+      }
+    }
+  };
+  const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(chatBody)
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  const content = data.choices?.[0]?.logprobs?.content || [];
+  const answers = {};
+  qs.forEach((q, qi) => {
+    const pos = tpl.slotPositions[qi];
+    const topList = content[pos]?.top_logprobs || [];
+    const lpMap = {};
+    for (const item of topList) {
+      const t = (item.token || "").trim();
+      if (lpMap[t] === undefined || item.logprob > lpMap[t]) lpMap[t] = item.logprob;
+    }
+    const vals = Object.values(lpMap);
+    const floor = (vals.length ? Math.min(...vals) : -20.0) - 5.0;
+    const lpT = q.labels.map(lbl => lpMap[lbl] ?? floor);
+    const mx = Math.max(...lpT);
+    const ex = lpT.map(x => Math.exp(x - mx));
+    const sumEx = ex.reduce((a, b) => a + b, 0) || 1;
+    const probs = ex.map(e => e / sumEx);
+    const pDict = {};
+    let bestIdx = 0;
+    q.choices.forEach(([name], i) => {
+      pDict[name] = probs[i];
+      if (probs[i] > probs[bestIdx]) bestIdx = i;
+    });
+    answers[q.id] = { choice: q.choices[bestIdx][0], probabilities: pDict, confidence: probs[bestIdx] };
+  });
+  return { answers, diagnostics: { timing: { total_ms: data.timing_ms || 0 } }, chat_request: chatBody };
 }
 
 let snake = [];
@@ -602,14 +709,8 @@ async function requestDecision(state) {
   };
   const t0 = performance.now();
   try {
-    const resp = await fetch(resolveEndpointUrl(), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(reqBody)
-    });
+    const data = await callDiffusionChatCompletions(reqBody, resolveBaseUrl());
     const ms = Math.round(performance.now() - t0);
-    const data = await resp.json();
-    if (!resp.ok) throw new Error("HTTP " + resp.status);
     sandboxFallback = false;
     return { data, ms };
   } catch (err) {

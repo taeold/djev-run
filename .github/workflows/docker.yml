@@ -10,8 +10,6 @@ on:
       - 'dino.html'
       - 'tetris.html'
       - 'entrypoint.sh'
-      - 'patch_vllm.py'
-      - 'structured_server.py'
 
 permissions:
   contents: read
@@ -24,24 +22,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Free runner disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
-
       - name: Stage container build context
         run: |
-          git clone --depth=1 https://github.com/mmastrac/djev-spark.git djev-spark
-          cp structured_server.py snake.html dino.html tetris.html djev-spark/server/
-          cp entrypoint.sh patch_vllm.py djev-spark/
-          cat > djev-spark/Dockerfile.cloudrun << 'EOF'
+          cat > Dockerfile.cloudrun << 'EOF'
           FROM ghcr.io/taeold/djev-run:latest
-          COPY patch_vllm.py /tmp/patch_vllm.py
-          RUN python3 /tmp/patch_vllm.py && rm /tmp/patch_vllm.py
-          COPY server/ /opt/dgemma/
-          COPY server/ /opt/dgemma/v9_baked/dgemma/
+          COPY snake.html dino.html tetris.html /opt/dgemma/
           COPY entrypoint.sh /entrypoint.sh
-          RUN chmod +x /entrypoint.sh && python3 -m compileall -f -q /opt/dgemma/structured_server.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/diffusion_gemma.py /usr/local/lib/python3.12/dist-packages/vllm/utils/diffusion.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/diffusion_scheduler.py
+          RUN chmod +x /entrypoint.sh
           EXPOSE 8080
           ENTRYPOINT ["/entrypoint.sh"]
           EOF
@@ -56,8 +43,8 @@ jobs:
       - name: Build and push ghcr.io/taeold/djev-run:latest
         uses: docker/build-push-action@v6
         with:
-          context: ./djev-spark
-          file: ./djev-spark/Dockerfile.cloudrun
+          context: .
+          file: ./Dockerfile.cloudrun
           platforms: linux/amd64
           push: true
           tags: ghcr.io/taeold/djev-run:latest

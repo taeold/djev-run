@@ -659,7 +659,7 @@
 
         <div class="panel json-panel">
           <div class="panel-head">
-            <span>Last /v1/systemone Call</span>
+            <span>Last /v1/chat/completions Call</span>
             <span id="json-meta" class="panel-sub">djev-dgemma · steps: 1 · 16 options</span>
           </div>
           <pre id="live-json"></pre>
@@ -669,7 +669,7 @@
 
     <footer class="foot-bar">
       <span>Engine adapted from <a href="https://github.com/trungdq88/jev-tetris" target="_blank" rel="noopener">trungdq88/jev-tetris</a> · Model: djev (DiffusionGemma-Jev)</span>
-      <span id="calls-counter">0 /v1/systemone calls · 0 tokens</span>
+      <span id="calls-counter">0 /v1/chat/completions calls · 0 tokens</span>
     </footer>
   </div>
 
@@ -1068,28 +1068,140 @@ function simulateSystemOne(gameInfo, placements) {
   };
 }
 
-function resolveEndpointUrl() {
+function resolveBaseUrl() {
   if (location.protocol.startsWith("http") && !location.hostname.includes("artifax")) {
-    return `${location.origin}/v1/systemone`;
+    return location.origin;
   }
-  return "/v1/systemone";
+  return "";
 }
 
 let sandboxFallback = false;
+const _tetrisTokCache = new Map();
 
 async function askJev(request, placements, gameInfo, signal) {
   const t0 = performance.now();
   if (!sandboxFallback) {
     try {
-      const res = await fetch(resolveEndpointUrl(), {
+      const baseUrl = resolveBaseUrl();
+      const qs = [];
+      for (const [qid, qspec] of Object.entries(request.questions || {})) {
+        const qtype = qspec.type || "choice";
+        const crit = qspec.criteria;
+        let opts = [], labels = [];
+        if (qtype === "choice") {
+          opts = Array.isArray(crit) ? crit.map(x => [String(x), null]) : Object.entries(crit || {});
+          labels = opts.map((_, i) => String.fromCharCode(97 + i));
+        } else if (qtype === "score") {
+          opts = (crit || []).map(x => [String(x), String(x)]);
+          labels = opts.map((_, i) => String(i + 1));
+        } else {
+          opts = [["yes", null], ["no", null]];
+          labels = ["yes", "no"];
+        }
+        qs.push({ id: qid, type: qtype, instructions: qspec.instructions || "", choices: opts, labels });
+      }
+      let sysText = "Answer a fixed set of questions about the state the user provides. Each question lists its allowed answers; reply with exactly one label per question.\n";
+      for (const q of qs) {
+        sysText += `\nQuestion ${q.id}: ${q.instructions.trim()}\n`;
+        q.choices.forEach(([name, desc], idx) => {
+          const lbl = q.labels[idx];
+          if (q.type === "noul") sysText += `  ${lbl}\n`;
+          else if (desc) sysText += `  ${lbl}: ${name} (${String(desc).trim()})\n`;
+          else sysText += `  ${lbl}: ${name}\n`;
+        });
+      }
+      sysText += '\nReply with one line per question, in this order, formatted as "id: label".';
+      const baseStr = qs.map(q => `${q.id}: ${q.labels[0]}`).join("\n");
+      const altStr = qs.map(q => `${q.id}: ${q.labels[Math.min(1, q.labels.length - 1)]}`).join("\n");
+      const cacheKey = `${baseUrl}|${baseStr}|${altStr}`;
+      let tpl = _tetrisTokCache.get(cacheKey);
+      if (!tpl) {
+        const tokRes = await fetch(`${baseUrl}/tokenize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompts: [baseStr, altStr], add_special_tokens: false }),
+          signal,
+        });
+        if (!tokRes.ok) throw new Error(`HTTP ${tokRes.status}`);
+        const tokData = await tokRes.json();
+        const baseToks = tokData.tokens[0], altToks = tokData.tokens[1];
+        const slotPositions = [], pinned = [];
+        for (let i = 0; i < baseToks.length; i++) {
+          if (baseToks[i] !== altToks[i]) slotPositions.push(i);
+          else pinned.push(i);
+        }
+        tpl = { baseToks, slotPositions, pinned };
+        _tetrisTokCache.set(cacheKey, tpl);
+      }
+      const seedCanvas = tpl.baseToks.slice();
+      for (const pos of tpl.slotPositions) seedCanvas[pos] = Math.floor(Math.random() * 262144);
+      const chatBody = {
+        model: request.model || "djev-dgemma",
+        messages: [
+          { role: "system", content: sysText },
+          { role: "user", content: typeof request.state === "string" ? request.state : JSON.stringify(request.state) }
+        ],
+        max_tokens: tpl.baseToks.length + 1,
+        logprobs: true,
+        top_logprobs: 20,
+        extra_body: {
+          vllm_xargs: {
+            diffusion_seed_canvas: seedCanvas,
+            diffusion_pinned: tpl.pinned,
+            diffusion_max_steps: request.steps || 1,
+            diffusion_read_only: true
+          }
+        }
+      };
+      const res = await fetch(`${baseUrl}/v1/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request),
+        body: JSON.stringify(chatBody),
         signal,
       });
       if (res.ok) {
-        const body = await res.json();
-        return { response: body, latencyMs: Math.round(performance.now() - t0), live: true };
+        const data = await res.json();
+        const content = data.choices?.[0]?.logprobs?.content || [];
+        const answers = {};
+        qs.forEach((q, qi) => {
+          const topList = content[tpl.slotPositions[qi]]?.top_logprobs || [];
+          const lpMap = {};
+          for (const item of topList) {
+            const t = (item.token || "").trim();
+            if (lpMap[t] === undefined || item.logprob > lpMap[t]) lpMap[t] = item.logprob;
+          }
+          const vals = Object.values(lpMap);
+          const floor = (vals.length ? Math.min(...vals) : -20.0) - 5.0;
+          const lpT = q.labels.map(lbl => lpMap[lbl] ?? floor);
+          const mx = Math.max(...lpT);
+          const ex = lpT.map(x => Math.exp(x - mx));
+          const sumEx = ex.reduce((a, b) => a + b, 0) || 1;
+          const probs = ex.map(e => e / sumEx);
+          if (q.type === "choice") {
+            const pDict = {};
+            let bestIdx = 0;
+            q.choices.forEach(([name], i) => {
+              pDict[name] = probs[i];
+              if (probs[i] > probs[bestIdx]) bestIdx = i;
+            });
+            answers[q.id] = { choice: q.choices[bestIdx][0], probabilities: pDict, confidence: probs[bestIdx] };
+          } else if (q.type === "score") {
+            const pDict = {};
+            let sc = 0;
+            probs.forEach((p, i) => {
+              pDict[String(i + 1)] = p;
+              sc += (i + 1) * p;
+            });
+            answers[q.id] = { score: sc, probabilities: pDict, confidence: Math.max(...probs) };
+          } else {
+            answers[q.id] = { noul: probs[0], probability: probs[0] };
+          }
+        });
+        return {
+          response: { answers, diagnostics: { timing: { total_ms: data.timing_ms || 0 } }, chat_request: chatBody },
+          latencyMs: Math.round(performance.now() - t0),
+          live: true,
+        };
       }
     } catch (e) {
       if (signal?.aborted) throw e;
@@ -1332,7 +1444,7 @@ function renderMetrics() {
   $("m-ms").textContent = `${stats.lastLatency} ms`;
   const agreePct = stats.decisions ? Math.round((stats.agreements / stats.decisions) * 100) : 100;
   $("m-agree").textContent = `${agreePct}%`;
-  $("calls-counter").textContent = `${stats.calls} /v1/systemone calls · ${stats.tokens.toLocaleString()} tokens`;
+  $("calls-counter").textContent = `${stats.calls} /v1/chat/completions calls · ${stats.tokens.toLocaleString()} tokens`;
 }
 
 function setStatus(text, state = "live") {
@@ -1468,7 +1580,7 @@ async function resolveMoveDecision(placements, signal) {
     prefetchEntry = null;
     $("m-pipeline").textContent = "prefetched (0 ms wait)";
   } else {
-    $("m-pipeline").textContent = "live /v1/systemone";
+    $("m-pipeline").textContent = "live /v1/chat/completions";
     promise = requestDecisionFor(game.board, game.current, game.next, game.lines, signal);
   }
   return await promise;
