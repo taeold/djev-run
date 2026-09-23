@@ -1,14 +1,19 @@
 # djev-run
 
-Serve DiffusionGemma-Jev (`djev`) on a TypeSafe AI compatible API on Cloud Run
-with an NVIDIA RTX PRO 6000 Blackwell GPU, built on
-[mmastrac/djev](https://github.com/mmastrac/djev).
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/taeold/djev-run/blob/main/colab.ipynb)
 
-Built-in demo apps, inspired by:
+Serve DiffusionGemma-Jev (`djev`) on a TypeSafe AI compatible API on Cloud Run
+with an NVIDIA RTX PRO 6000 Blackwell or NVIDIA L4 GPU, or run directly inside
+Google Colab Pro (`A100 40GB/80GB` or `L4 24GB`) via
+[`colab.ipynb`](https://colab.research.google.com/github/taeold/djev-run/blob/main/colab.ipynb),
+built on [mmastrac/djev](https://github.com/mmastrac/djev).
+
+Built-in demo apps:
 
 - `/snake`: [mizorewww/laya-coreml](https://github.com/mizorewww/laya-coreml)
 - `/dino`: [virajbhartiya/laya-vs-jev](https://github.com/virajbhartiya/laya-vs-jev)
 - `/tetris`: [trungdq88/jev-tetris](https://github.com/trungdq88/jev-tetris)
+- `/vision`: 1-step `6x6` spatial semantic segmentation (`36` cells in `~73 ms`) and `16`-sensor System-1 visual radar (`gemma4_vision` `280` soft tokens)
 
 <img width="640" height="360" alt="djev snake" src="https://github.com/user-attachments/assets/2e9a5321-f8a9-4734-b6f2-4d6f47193390" />
 
@@ -71,12 +76,13 @@ gcloud beta run deploy djev-dgemma \
 
 ### Step 3: Open the Built-in Demos
 
-All three demos are standalone HTML files with zero external dependencies that
+All four demos are standalone HTML files with zero external dependencies that
 call `POST /v1/systemone` directly from the browser via `fetch()`:
 
 - Snake: `https://<your-cloud-run-url>/snake`
 - Chrome Dino: `https://<your-cloud-run-url>/dino`
 - Tetris: `https://<your-cloud-run-url>/tetris`
+- Vision (1-Step `6x6` Segmentation & Radar): `https://<your-cloud-run-url>/vision`
 
 --------------------------------------------------------------------------------
 

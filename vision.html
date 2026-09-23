@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>djev · Vision</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-primary: #090a0f;
+    --bg-secondary: #121520;
+    --bg-tertiary: #171b29;
+    --bg-elevated: #1e2336;
+    --border: #1e2336;
+    --border-bright: #2a314d;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-emerald: #10b981;
+    --accent-cyan: #38bdf8;
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
+    --accent-slate: #94a3b8;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  html, body {
+    min-height: 100%;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 20px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .brand-logo {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+  }
+
+  .brand-sep {
+    color: var(--border-bright);
+  }
+
+  .brand-title {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .brand-meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: background-color 0.2s;
+  }
+  .status-dot.ready { background: var(--accent-emerald); }
+  .status-dot.busy { background: var(--accent-amber); }
+  .status-dot.error { background: var(--accent-rose); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  .nav-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .nav-links a:hover { color: var(--text-primary); background: var(--bg-secondary); }
+  .nav-links a.active { color: var(--accent-emerald); font-weight: 600; }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    flex-wrap: wrap;
+  }
+
+  .toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .group-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-right: 2px;
+  }
+
+  .btn {
+    height: 30px;
+    padding: 0 11px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .btn:hover {
+    color: var(--text-primary);
+    border-color: var(--border-bright);
+  }
+  .btn.active {
+    color: var(--text-primary);
+    background: var(--bg-elevated);
+    border-color: var(--accent-cyan);
+  }
+  .btn-primary {
+    color: #04130d;
+    background: var(--accent-emerald);
+    border-color: var(--accent-emerald);
+    font-weight: 600;
+  }
+  .btn-primary:hover {
+    color: #04130d;
+    background: #34d399;
+    border-color: #34d399;
+  }
+  .btn-primary:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: 504px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  @media (max-width: 980px) {
+    .workspace {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .panel-title {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+  }
+
+  .panel-subtitle {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stage-wrap {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .canvas-box {
+    position: relative;
+    width: 480px;
+    height: 360px;
+    background: #05060a;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 auto;
+    cursor: crosshair;
+  }
+
+  .canvas-box canvas, .canvas-box video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 480px;
+    height: 360px;
+    display: block;
+  }
+
+  #webcamVideo {
+    display: none;
+    object-fit: cover;
+  }
+
+  .seg-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+  }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .chip-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    height: 25px;
+    padding: 0 9px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .chip:hover { color: var(--text-primary); border-color: var(--border-bright); }
+  .chip.active {
+    color: var(--text-primary);
+    background: var(--bg-elevated);
+    border-color: var(--accent-emerald);
+  }
+
+  .swatch {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  .text-input {
+    height: 28px;
+    padding: 0 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-primary);
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    flex: 1;
+    min-width: 140px;
+  }
+  .text-input:focus {
+    outline: none;
+    border-color: var(--accent-cyan);
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-primary);
+    gap: 1px;
+  }
+
+  .stat-cell {
+    background: var(--bg-secondary);
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .stat-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
+  .stat-val {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .telemetry-body {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .bars-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 148px 1fr 56px;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bar-name {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .bar-track {
+    height: 8px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.18s ease-out;
+  }
+
+  .bar-pct {
+    text-align: right;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  .cell-inspector {
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 86px;
+  }
+
+  .radar-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .radar-card {
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  details.raw-drawer {
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+  }
+
+  details.raw-drawer summary {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .raw-pre {
+    margin-top: 8px;
+    padding: 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    max-height: 220px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="brand">
+      <span class="brand-logo">djev</span>
+      <span class="brand-sep">/</span>
+      <span class="brand-title">Vision</span>
+      <span class="status-dot ready" id="statusDot"></span>
+      <span class="brand-meta" id="statusText">Gemma 4 Vision (280 soft tokens) · 1-step canvas read</span>
+    </div>
+    <div class="header-right">
+      <nav class="nav-links">
+        <a href="/snake">snake</a>
+        <a href="/dino">dino</a>
+        <a href="/tetris">tetris</a>
+        <a href="/vision" class="active">vision</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="toolbar-group">
+      <span class="group-label">Mode</span>
+      <button class="btn active" id="modeSegBtn" onclick="setMode('seg')">1-Pass Grid Segmentation (6x6)</button>
+      <button class="btn" id="modeRadarBtn" onclick="setMode('radar')">System-1 Visual Radar (16 Sensors)</button>
+    </div>
+
+    <div class="toolbar-group">
+      <span class="group-label">Scene</span>
+      <button class="btn active" id="presetCrosswalkBtn" onclick="loadPreset('crosswalk')">Street Crosswalk</button>
+      <button class="btn" id="presetDeskBtn" onclick="loadPreset('desk')">Desk Setup</button>
+      <button class="btn" id="presetParkBtn" onclick="loadPreset('park')">Park &amp; Dog</button>
+      <button class="btn" onclick="document.getElementById('fileInput').click()">Upload Image</button>
+      <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFileUpload(event)">
+      <button class="btn" id="webcamBtn" onclick="toggleWebcam()">Webcam</button>
+      <button class="btn btn-primary" id="runBtn" onclick="runEvaluation()">Run 1-Step Read</button>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <!-- Left Column: Visual Stage & Segmentation Controls -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title" id="stageTitle">Visual Input + 1-Step Diffusion Mask</span>
+        <span class="panel-subtitle" id="stageSubtitle">480x360 · 6x6 Parallel Canvas</span>
+      </div>
+      <div class="stage-wrap">
+        <div class="canvas-box" id="canvasBox">
+          <video id="webcamVideo" autoplay playsinline muted></video>
+          <canvas id="baseCanvas" width="480" height="360"></canvas>
+          <canvas id="overlayCanvas" width="480" height="360"></canvas>
+        </div>
+
+        <div class="seg-controls" id="segControls">
+          <div class="control-row">
+            <span class="group-label">Segmentation Schema</span>
+            <div class="chip-row">
+              <button class="chip active" id="schemaMultiBtn" onclick="setSegSchema('multi')">6-Class Scene Map (choice)</button>
+              <button class="chip" id="schemaBinaryBtn" onclick="setSegSchema('binary')">Target Mask (noul)</button>
+            </div>
+          </div>
+
+          <div class="control-row" id="binaryTargetRow" style="display:none;">
+            <span class="group-label">Target</span>
+            <div class="chip-row">
+              <button class="chip active" onclick="setBinaryTarget('red car or vehicle', this)">Vehicle</button>
+              <button class="chip" onclick="setBinaryTarget('person or pedestrian', this)">Person</button>
+              <button class="chip" onclick="setBinaryTarget('road or crosswalk pavement', this)">Road</button>
+              <button class="chip" onclick="setBinaryTarget('sky or clouds', this)">Sky</button>
+              <button class="chip" onclick="setBinaryTarget('trees, grass, or plant foliage', this)">Foliage</button>
+              <button class="chip" onclick="setBinaryTarget('laptop screen or monitor', this)">Laptop</button>
+            </div>
+            <input type="text" class="text-input" id="customTargetInput" value="red car or vehicle" placeholder="Custom target..." onkeydown="if(event.key==='Enter') runEvaluation()">
+          </div>
+
+          <div class="control-row">
+            <span class="group-label">Overlay View</span>
+            <div class="chip-row">
+              <button class="chip active" id="viewSmoothBtn" onclick="setOverlayStyle('smooth')">Smooth Mask + Grid</button>
+              <button class="chip" id="viewGridBtn" onclick="setOverlayStyle('grid')">Crisp 6x6 Cells</button>
+              <button class="chip" id="viewRawBtn" onclick="setOverlayStyle('raw')">Original Image</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Live Telemetry & Probabilities -->
+    <div class="panel">
+      <div class="stat-grid">
+        <div class="stat-cell">
+          <span class="stat-label">Latency</span>
+          <span class="stat-val" id="statLatency">-- ms</span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-label">Canvas Reads</span>
+          <span class="stat-val" id="statReads">36 slots · 1 step</span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-label">Vision Tokens</span>
+          <span class="stat-val" id="statTokens">280 soft</span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-label">Mean Confidence</span>
+          <span class="stat-val" id="statConfidence">--%</span>
+        </div>
+      </div>
+
+      <div class="telemetry-body">
+        <!-- Segmentation Telemetry View -->
+        <div id="segTelemetryView" style="display:flex; flex-direction:column; gap:14px;">
+          <div>
+            <div class="section-label" style="margin-bottom:8px;">
+              <span id="segSummaryHeader">Scene Class Coverage (36 Spatial Cells)</span>
+              <span id="segDominantLabel">Hover any cell on canvas to inspect</span>
+            </div>
+            <div class="bars-list" id="segClassBars"></div>
+          </div>
+
+          <div class="cell-inspector">
+            <div class="section-label">
+              <span id="cellInspectorTitle">Cell Probability Inspector</span>
+              <span id="cellInspectorCoords" style="color:var(--accent-cyan);">r3c1 (Row 4, Col 2)</span>
+            </div>
+            <div class="bars-list" id="cellInspectorBars"></div>
+          </div>
+        </div>
+
+        <!-- Radar Telemetry View -->
+        <div id="radarTelemetryView" style="display:none; flex-direction:column; gap:14px;">
+          <div class="radar-grid">
+            <div class="radar-card">
+              <div class="section-label"><span>Scene &amp; Lighting (choice)</span></div>
+              <div class="bars-list" id="radarChoiceBars"></div>
+            </div>
+            <div class="radar-card">
+              <div class="section-label"><span>Safety &amp; Complexity (score 1-4)</span></div>
+              <div class="bars-list" id="radarScoreBars"></div>
+            </div>
+          </div>
+          <div class="radar-grid">
+            <div class="radar-card">
+              <div class="section-label"><span>Object Detectors (noul P(yes))</span></div>
+              <div class="bars-list" id="radarObjectBars"></div>
+            </div>
+            <div class="radar-card">
+              <div class="section-label"><span>Spatial Zone Activity (noul)</span></div>
+              <div class="bars-list" id="radarZoneBars"></div>
+            </div>
+          </div>
+        </div>
+
+        <details class="raw-drawer">
+          <summary>View /v1/systemone payload &amp; diagnostics</summary>
+          <pre class="raw-pre" id="rawPayloadPre">Waiting for first evaluation...</pre>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CLASSES = [
+  { key: 'sky',      name: 'Sky / Air',        color: '#38bdf8', rgb: [56, 189, 248],  desc: 'sky or clouds' },
+  { key: 'building', name: 'Structure / Desk', color: '#94a3b8', rgb: [148, 163, 184], desc: 'building, wall, or desk' },
+  { key: 'foliage',  name: 'Trees / Plant',    color: '#10b981', rgb: [16, 185, 129],  desc: 'trees, grass, or plant' },
+  { key: 'road',     name: 'Road / Ground',    color: '#64748b', rgb: [100, 116, 139], desc: 'road, crosswalk, or path' },
+  { key: 'vehicle',  name: 'Vehicle / Tech',   color: '#f43f5e', rgb: [244, 63, 94],   desc: 'red car or laptop screen' },
+  { key: 'subject',  name: 'Person / Object',  color: '#f59e0b', rgb: [245, 158, 11],  desc: 'pedestrian, dog, or mug' }
+];
+
+const CLASS_MAP = Object.fromEntries(CLASSES.map(c => [c.key, c]));
+
+let currentMode = 'seg'; // 'seg' | 'radar'
+let segSchema = 'multi'; // 'multi' | 'binary'
+let binaryTarget = 'red car or vehicle';
+let overlayStyle = 'smooth'; // 'smooth' | 'grid' | 'raw'
+let currentPreset = 'crosswalk';
+let isRunning = false;
+let webcamStream = null;
+let webcamTimer = null;
+
+let lastSegResults = null; // 6x6 array of { probs, topKey, confidence }
+let hoveredCell = { r: 3, c: 1 };
+
+const baseCanvas = document.getElementById('baseCanvas');
+const baseCtx = baseCanvas.getContext('2d');
+const overlayCanvas = document.getElementById('overlayCanvas');
+const overlayCtx = overlayCanvas.getContext('2d');
+
+// Draw rich, crisp recognizable scenes onto baseCanvas
+function drawPresetScene(preset) {
+  const W = 480, H = 360;
+  baseCtx.clearRect(0, 0, W, H);
+
+  if (preset === 'crosswalk') {
+    // 1. Sky gradient (rows 0..1)
+    const skyGrad = baseCtx.createLinearGradient(0, 0, 0, 145);
+    skyGrad.addColorStop(0, '#1e88e5');
+    skyGrad.addColorStop(1, '#90caf9');
+    baseCtx.fillStyle = skyGrad;
+    baseCtx.fillRect(0, 0, W, 145);
+
+    // Sun & fluffy clouds
+    baseCtx.fillStyle = '#fff59d';
+    baseCtx.beginPath();
+    baseCtx.arc(405, 42, 22, 0, Math.PI * 2);
+    baseCtx.fill();
+
+    baseCtx.fillStyle = 'rgba(255,255,255,0.92)';
+    [[110, 40, 28, 14], [135, 36, 22, 12], [260, 52, 34, 14], [285, 48, 24, 12]].forEach(([x, y, rx, ry]) => {
+      baseCtx.beginPath();
+      baseCtx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+      baseCtx.fill();
+    });
+
+    // 2. City Buildings (left & center-left, rows 1..3)
+    const bldgs = [
+      { x: 0, y: 58, w: 88, h: 142, c: '#455a64', win: '#cfd8dc' },
+      { x: 84, y: 78, w: 86, h: 122, c: '#546e7a', win: '#dce775' },
+      { x: 168, y: 66, w: 78, h: 134, c: '#37474f', win: '#b0bec5' }
+    ];
+    bldgs.forEach(b => {
+      baseCtx.fillStyle = b.c;
+      baseCtx.fillRect(b.x, b.y, b.w, b.h);
+      baseCtx.fillStyle = b.win;
+      for (let wy = b.y + 12; wy < b.y + b.h - 16; wy += 20) {
+        for (let wx = b.x + 10; wx < b.x + b.w - 14; wx += 18) {
+          baseCtx.fillRect(wx, wy, 10, 12);
+        }
+      }
+    });
+
+    // 3. Green Trees on Right (cols 3..5, rows 1..3)
+    baseCtx.fillStyle = '#5d4037';
+    baseCtx.fillRect(350, 140, 16, 62);
+    baseCtx.fillRect(425, 145, 14, 57);
+    const canopies = [[358, 120, 42], [335, 138, 32], [380, 136, 34], [432, 124, 38], [410, 140, 28]];
+    canopies.forEach(([cx, cy, r], i) => {
+      baseCtx.fillStyle = i % 2 === 0 ? '#2e7d32' : '#43a047';
+      baseCtx.beginPath();
+      baseCtx.arc(cx, cy, r, 0, Math.PI * 2);
+      baseCtx.fill();
+    });
+
+    // Sidewalk curb
+    baseCtx.fillStyle = '#90a4ae';
+    baseCtx.fillRect(0, 196, W, 14);
+
+    // 4. Asphalt Road & White Zebra Crosswalk (rows 3..5)
+    baseCtx.fillStyle = '#263238';
+    baseCtx.fillRect(0, 210, W, 150);
+
+    // Dashed lane line
+    baseCtx.fillStyle = '#fbc02d';
+    for (let lx = 15; lx < 250; lx += 42) {
+      baseCtx.fillRect(lx, 278, 24, 5);
+    }
+
+    // Zebra Crosswalk stripes on right side
+    baseCtx.fillStyle = '#eceff1';
+    for (let sy = 220; sy < 350; sy += 22) {
+      baseCtx.beginPath();
+      baseCtx.moveTo(285, sy);
+      baseCtx.lineTo(445, sy);
+      baseCtx.lineTo(460, sy + 13);
+      baseCtx.lineTo(275, sy + 13);
+      baseCtx.closePath();
+      baseCtx.fill();
+    }
+
+    // 5. Red Car on Left Road (rows D..E, cols 1..3: x=16..234, y=182..294)
+    baseCtx.fillStyle = '#e53935';
+    baseCtx.beginPath();
+    baseCtx.roundRect(16, 212, 218, 66, 12);
+    baseCtx.fill();
+    // Car cabin roof
+    baseCtx.fillStyle = '#d32f2f';
+    baseCtx.beginPath();
+    baseCtx.moveTo(48, 214);
+    baseCtx.lineTo(82, 174);
+    baseCtx.lineTo(176, 174);
+    baseCtx.lineTo(208, 214);
+    baseCtx.closePath();
+    baseCtx.fill();
+    // Car windows
+    baseCtx.fillStyle = '#81d4fa';
+    baseCtx.beginPath();
+    baseCtx.moveTo(58, 211);
+    baseCtx.lineTo(86, 180);
+    baseCtx.lineTo(128, 180);
+    baseCtx.lineTo(128, 211);
+    baseCtx.closePath();
+    baseCtx.fill();
+    baseCtx.fillRect(134, 180, 38, 31);
+    // Headlights
+    baseCtx.fillStyle = '#ffee58';
+    baseCtx.fillRect(220, 226, 12, 18);
+    // Wheels
+    [[66, 278], [184, 278]].forEach(([wx, wy]) => {
+      baseCtx.fillStyle = '#111';
+      baseCtx.beginPath();
+      baseCtx.arc(wx, wy, 22, 0, Math.PI * 2);
+      baseCtx.fill();
+      baseCtx.fillStyle = '#cfd8dc';
+      baseCtx.beginPath();
+      baseCtx.arc(wx, wy, 10, 0, Math.PI * 2);
+      baseCtx.fill();
+    });
+
+    // 6. Pedestrian walking on Crosswalk (cols 5..6, rows D..E)
+    // Head
+    baseCtx.fillStyle = '#ffccbc';
+    baseCtx.beginPath();
+    baseCtx.arc(364, 186, 15, 0, Math.PI * 2);
+    baseCtx.fill();
+    // Bright amber jacket torso
+    baseCtx.fillStyle = '#ffb300';
+    baseCtx.beginPath();
+    baseCtx.roundRect(346, 203, 36, 54, 7);
+    baseCtx.fill();
+    // Blue jeans legs walking
+    baseCtx.strokeStyle = '#1e88e5';
+    baseCtx.lineWidth = 11;
+    baseCtx.lineCap = 'round';
+    baseCtx.beginPath();
+    baseCtx.moveTo(356, 255);
+    baseCtx.lineTo(344, 302);
+    baseCtx.moveTo(372, 255);
+    baseCtx.lineTo(384, 302);
+    baseCtx.stroke();
+  } else if (preset === 'desk') {
+    // Wall background
+    baseCtx.fillStyle = '#1e293b';
+    baseCtx.fillRect(0, 0, W, 230);
+    // Wood desk surface
+    const wood = baseCtx.createLinearGradient(0, 230, 0, H);
+    wood.addColorStop(0, '#8d5524');
+    wood.addColorStop(1, '#5c3818');
+    baseCtx.fillStyle = wood;
+    baseCtx.fillRect(0, 230, W, 130);
+
+    // Potted green plant on left (cols 0..1, rows 1..4)
+    baseCtx.fillStyle = '#d97706';
+    baseCtx.beginPath();
+    baseCtx.moveTo(42, 205);
+    baseCtx.lineTo(104, 205);
+    baseCtx.lineTo(94, 265);
+    baseCtx.lineTo(52, 265);
+    baseCtx.closePath();
+    baseCtx.fill();
+    // Leaves
+    baseCtx.fillStyle = '#10b981';
+    [[73, 155, 26, 45, 0], [48, 170, 22, 38, -0.4], [98, 170, 22, 38, 0.4], [60, 135, 18, 34, -0.2], [86, 135, 18, 34, 0.2]].forEach(([x, y, rx, ry, rot]) => {
+      baseCtx.beginPath();
+      baseCtx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+      baseCtx.fill();
+    });
+
+    // Laptop Computer in Center (cols 1..4, rows 1..4)
+    baseCtx.fillStyle = '#cbd5e1';
+    baseCtx.beginPath();
+    baseCtx.roundRect(142, 86, 196, 132, 8);
+    baseCtx.fill();
+    // Screen display
+    baseCtx.fillStyle = '#0f172a';
+    baseCtx.fillRect(150, 94, 180, 114);
+    // Code lines & chart on laptop screen
+    baseCtx.fillStyle = '#38bdf8';
+    baseCtx.fillRect(164, 108, 70, 8);
+    baseCtx.fillStyle = '#10b981';
+    baseCtx.fillRect(164, 124, 115, 8);
+    baseCtx.fillStyle = '#f59e0b';
+    baseCtx.fillRect(164, 140, 92, 8);
+    baseCtx.fillStyle = '#38bdf8';
+    baseCtx.fillRect(164, 162, 140, 30);
+    // Laptop keyboard base
+    baseCtx.fillStyle = '#94a3b8';
+    baseCtx.beginPath();
+    baseCtx.moveTo(135, 218);
+    baseCtx.lineTo(345, 218);
+    baseCtx.lineTo(368, 262);
+    baseCtx.lineTo(112, 262);
+    baseCtx.closePath();
+    baseCtx.fill();
+    baseCtx.fillStyle = '#334155';
+    baseCtx.fillRect(152, 226, 176, 22);
+
+    // Red Coffee Mug on Right (cols 4..5, rows 3..4)
+    baseCtx.fillStyle = '#ef4444';
+    baseCtx.beginPath();
+    baseCtx.roundRect(384, 192, 52, 64, 6);
+    baseCtx.fill();
+    baseCtx.strokeStyle = '#ef4444';
+    baseCtx.lineWidth = 8;
+    baseCtx.beginPath();
+    baseCtx.arc(436, 224, 15, -Math.PI / 2, Math.PI / 2);
+    baseCtx.stroke();
+  } else if (preset === 'park') {
+    // Sunny blue sky
+    const sky = baseCtx.createLinearGradient(0, 0, 0, 150);
+    sky.addColorStop(0, '#0284c7');
+    sky.addColorStop(1, '#bae6fd');
+    baseCtx.fillStyle = sky;
+    baseCtx.fillRect(0, 0, W, 150);
+
+    // Green grass lawn (rows 2..5)
+    const grass = baseCtx.createLinearGradient(0, 150, 0, H);
+    grass.addColorStop(0, '#22c55e');
+    grass.addColorStop(1, '#15803d');
+    baseCtx.fillStyle = grass;
+    baseCtx.fillRect(0, 150, W, 210);
+
+    // Trees along left/middle horizon
+    [[65, 110, 48], [130, 118, 42], [410, 112, 46]].forEach(([tx, ty, r]) => {
+      baseCtx.fillStyle = '#78350f';
+      baseCtx.fillRect(tx - 8, ty + 18, 16, 52);
+      baseCtx.fillStyle = '#166534';
+      baseCtx.beginPath();
+      baseCtx.arc(tx, ty, r, 0, Math.PI * 2);
+      baseCtx.fill();
+    });
+
+    // Sandy footpath
+    baseCtx.fillStyle = '#d6d3d1';
+    baseCtx.beginPath();
+    baseCtx.moveTo(190, 150);
+    baseCtx.lineTo(275, 150);
+    baseCtx.lineTo(365, 360);
+    baseCtx.lineTo(110, 360);
+    baseCtx.closePath();
+    baseCtx.fill();
+
+    // Golden Retriever Dog in Center-Right Foreground (rows 3..5, cols 2..4)
+    baseCtx.fillStyle = '#f59e0b';
+    // Body
+    baseCtx.beginPath();
+    baseCtx.roundRect(205, 228, 112, 56, 22);
+    baseCtx.fill();
+    // Head
+    baseCtx.beginPath();
+    baseCtx.arc(312, 212, 28, 0, Math.PI * 2);
+    baseCtx.fill();
+    // Snout & ear
+    baseCtx.fillStyle = '#d97706';
+    baseCtx.beginPath();
+    baseCtx.roundRect(326, 208, 22, 16, 6);
+    baseCtx.fill();
+    baseCtx.beginPath();
+    baseCtx.ellipse(298, 216, 10, 18, 0.2, 0, Math.PI * 2);
+    baseCtx.fill();
+    // Legs & Tail
+    baseCtx.fillStyle = '#f59e0b';
+    [216, 240, 282, 302].forEach(lx => baseCtx.fillRect(lx, 276, 12, 42));
+    baseCtx.strokeStyle = '#f59e0b';
+    baseCtx.lineWidth = 10;
+    baseCtx.beginPath();
+    baseCtx.moveTo(208, 238);
+    baseCtx.quadraticCurveTo(175, 212, 184, 195);
+    baseCtx.stroke();
+  }
+}
+
+const ROW_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+function getDownscaledBase64JPEG() {
+  const W = 384, H = 288;
+  const tmp = document.createElement('canvas');
+  tmp.width = W;
+  tmp.height = H;
+  const tctx = tmp.getContext('2d');
+  const video = document.getElementById('webcamVideo');
+  if (webcamStream && video.style.display !== 'none' && video.readyState >= 2) {
+    baseCtx.drawImage(video, 0, 0, 480, 360);
+  }
+  tctx.drawImage(baseCanvas, 0, 0, W, H);
+
+  // In 6x6 Grid Segmentation mode, stamp Set-of-Mark (A1..F6) coordinate grid onto the VLM input tensor
+  if (currentMode === 'seg') {
+    const cw = W / 6, ch = H / 6;
+    tctx.font = 'bold 10px monospace';
+    tctx.textAlign = 'center';
+    tctx.textBaseline = 'middle';
+    for (let r = 0; r < 6; r++) {
+      for (let c = 0; c < 6; c++) {
+        const x0 = c * cw, y0 = r * ch;
+        tctx.strokeStyle = 'rgba(255,255,255,0.65)';
+        tctx.lineWidth = 1;
+        tctx.strokeRect(x0 + 0.5, y0 + 0.5, cw - 1, ch - 1);
+        const lbl = `${ROW_LETTERS[r]}${c + 1}`;
+        tctx.fillStyle = 'rgba(0,0,0,0.65)';
+        tctx.fillRect(x0 + 3, y0 + 3, 20, 13);
+        tctx.fillStyle = '#ffffff';
+        tctx.fillText(lbl, x0 + 13, y0 + 10);
+      }
+    }
+  }
+  return tmp.toDataURL('image/jpeg', 0.88);
+}
+
+function buildSegQuestions() {
+  const questions = {};
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 6; c++) {
+      const qid = `r${r}c${c}`;
+      const lbl = `${ROW_LETTERS[r]}${c + 1}`;
+      if (segSchema === 'multi') {
+        const criteria = {};
+        CLASSES.forEach(cls => { criteria[cls.key] = cls.desc; });
+        questions[qid] = {
+          type: 'choice',
+          instructions: `Dominant element in cell ${lbl}`,
+          criteria
+        };
+      } else {
+        questions[qid] = {
+          type: 'noul',
+          instructions: `Cell ${lbl} contains ${binaryTarget}?`,
+          criteria: {
+            "true": `contains ${binaryTarget}`,
+            "false": `no ${binaryTarget}`
+          }
+        };
+      }
+    }
+  }
+  return questions;
+}
+
+function buildRadarQuestions() {
+  return {
+    environment: {
+      type: 'choice',
+      instructions: 'Primary scene environment',
+      criteria: {
+        urban_street: 'Outdoor city street, road, buildings, or crosswalk',
+        indoor_desk: 'Indoor desk, office workspace, or room',
+        nature_park: 'Outdoor park, grass lawn, trees, or nature',
+        other_scene: 'Other environment'
+      }
+    },
+    lighting: {
+      type: 'choice',
+      instructions: 'Dominant lighting condition',
+      criteria: {
+        daylight: 'Bright outdoor sunlight or blue sky',
+        indoor_ambient: 'Indoor room or screen lighting',
+        night_dark: 'Dark night or low-light scene'
+      }
+    },
+    primary_focus: {
+      type: 'choice',
+      instructions: 'Main foreground subject in the image',
+      criteria: {
+        vehicle_and_person: 'Car/vehicle and pedestrian on street',
+        computer_workspace: 'Laptop computer, mug, and plant on desk',
+        animal_in_park: 'Dog or animal outdoors on grass',
+        other_subject: 'Other primary subject'
+      }
+    },
+    scene_activity: {
+      type: 'score',
+      instructions: 'Level of motion or dynamic street activity',
+      criteria: ['Static indoor still life', 'Calm outdoor scene', 'Active pedestrian/park motion', 'Busy street traffic and crossing']
+    },
+    visual_complexity: {
+      type: 'score',
+      instructions: 'Visual density and number of distinct objects',
+      criteria: ['Minimal / empty', 'Simple (1-2 items)', 'Moderate (3-5 distinct elements)', 'Rich multi-element scene']
+    },
+    has_vehicle: {
+      type: 'noul',
+      instructions: 'Is there a car or motor vehicle visible?',
+      criteria: { "true": 'A car or vehicle is visible', "false": 'No vehicle visible' }
+    },
+    has_person: {
+      type: 'noul',
+      instructions: 'Is there a person or pedestrian visible?',
+      criteria: { "true": 'A person or human figure is visible', "false": 'No person visible' }
+    },
+    has_vegetation: {
+      type: 'noul',
+      instructions: 'Are there green trees, grass, or a potted plant visible?',
+      criteria: { "true": 'Trees, grass, or plants are visible', "false": 'No vegetation visible' }
+    },
+    has_laptop_screen: {
+      type: 'noul',
+      instructions: 'Is there a laptop computer or monitor screen visible?',
+      criteria: { "true": 'A laptop or computer monitor is visible', "false": 'No laptop or monitor visible' }
+    },
+    has_animal_dog: {
+      type: 'noul',
+      instructions: 'Is there a dog or pet animal visible?',
+      criteria: { "true": 'A dog or animal is visible', "false": 'No dog or animal visible' }
+    },
+    has_mug_cup: {
+      type: 'noul',
+      instructions: 'Is there a coffee mug or cup visible?',
+      criteria: { "true": 'A coffee mug or cup is visible', "false": 'No mug or cup visible' }
+    },
+    zone_top_sky: {
+      type: 'noul',
+      instructions: 'Is the top third of the image open sky?',
+      criteria: { "true": 'Top third is sky', "false": 'Top third is indoor wall or ceiling' }
+    },
+    zone_left_subject: {
+      type: 'noul',
+      instructions: 'Is there a prominent object (car or plant) on the left side?',
+      criteria: { "true": 'Prominent object on left side', "false": 'Nothing prominent on left' }
+    },
+    zone_center_subject: {
+      type: 'noul',
+      instructions: 'Is there a prominent subject in the center of the frame?',
+      criteria: { "true": 'Prominent subject in center', "false": 'Center is empty' }
+    },
+    zone_right_subject: {
+      type: 'noul',
+      instructions: 'Is there a person, dog, mug, or tree on the right side?',
+      criteria: { "true": 'Object or person on right side', "false": 'Right side is empty' }
+    },
+    zone_bottom_ground: {
+      type: 'noul',
+      instructions: 'Is the bottom third a ground plane (road, grass, or desk surface)?',
+      criteria: { "true": 'Bottom third is road, grass, or desk surface', "false": 'No ground or desk plane' }
+    }
+  };
+}
+
+async function runEvaluation() {
+  if (isRunning) return;
+  isRunning = true;
+
+  const dot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  const runBtn = document.getElementById('runBtn');
+  dot.className = 'status-dot busy';
+  runBtn.disabled = true;
+  runBtn.textContent = 'Reading Canvas...';
+
+  if (segSchema === 'binary') {
+    binaryTarget = document.getElementById('customTargetInput').value.trim() || 'foreground object';
+  }
+
+  const dataUrl = getDownscaledBase64JPEG();
+  const rawQuestions = currentMode === 'seg' ? buildSegQuestions() : buildRadarQuestions();
+  const questions = currentMode === 'seg'
+    ? rawQuestions
+    : Object.fromEntries(Object.entries(rawQuestions).map(([k, v]) => [`${k}0`, v]));
+  const statePrompt = currentMode === 'seg'
+    ? 'Inspect the image across a 6x6 spatial grid (rows r0..r5 from top to bottom, columns c0..c5 from left to right) and classify each region accurately.'
+    : 'Inspect the image and evaluate all 16 visual scene, object, and spatial attributes.';
+
+  const payload = {
+    model: 'djev-dgemma',
+    steps: 1,
+    samples: 1,
+    images: [dataUrl],
+    state: statePrompt,
+    questions
+  };
+
+  const t0 = performance.now();
+  try {
+    const resp = await fetch('/v1/systemone', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const rttMs = Math.round(performance.now() - t0);
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error((data.error && data.error.message) || `HTTP ${resp.status}`);
+    }
+
+    const serverMs = data.diagnostics && data.diagnostics.timing
+      ? Math.round(data.diagnostics.timing.total_ms)
+      : rttMs;
+    document.getElementById('statLatency').textContent = `${serverMs}ms (${rttMs}ms)`;
+
+    const qCount = Object.keys(questions).length;
+    document.getElementById('statReads').textContent = `${qCount} slots · 1 step`;
+
+    const rawAnswers = data.answers || data;
+    const answers = currentMode === 'seg'
+      ? rawAnswers
+      : Object.fromEntries(Object.entries(rawAnswers).map(([k, v]) => [k.replace(/0$/, ''), v]));
+    if (currentMode === 'seg') {
+      processSegResponse(answers);
+    } else {
+      processRadarResponse(answers);
+    }
+
+    document.getElementById('rawPayloadPre').textContent = JSON.stringify({
+      latency_ms: { server_ms: serverMs, round_trip_ms: rttMs },
+      diagnostics: data.diagnostics,
+      sample_answers: Object.fromEntries(Object.entries(answers).slice(0, 8))
+    }, null, 2);
+
+    dot.className = 'status-dot ready';
+    statusText.textContent = `1-step read complete in ${serverMs}ms server (${rttMs}ms total)`;
+  } catch (err) {
+    dot.className = 'status-dot error';
+    statusText.textContent = `Error: ${err.message}`;
+    document.getElementById('rawPayloadPre').textContent = String(err.stack || err);
+  } finally {
+    isRunning = false;
+    runBtn.disabled = false;
+    runBtn.textContent = 'Run 1-Step Read';
+  }
+}
+
+function processSegResponse(answers) {
+  const grid = [];
+  let confSum = 0;
+  let count = 0;
+  const classTotals = Object.fromEntries(CLASSES.map(c => [c.key, 0]));
+
+  for (let r = 0; r < 6; r++) {
+    const row = [];
+    for (let c = 0; c < 6; c++) {
+      const qid = `r${r}c${c}`;
+      const a = answers[qid];
+      if (segSchema === 'multi' && a && a.probabilities) {
+        const probs = a.probabilities;
+        let topKey = a.choice || 'sky';
+        let topP = probs[topKey] ?? 0;
+        CLASSES.forEach(cls => {
+          const p = probs[cls.key] || 0;
+          classTotals[cls.key] += p;
+          if (p > topP) { topP = p; topKey = cls.key; }
+        });
+        confSum += topP;
+        count++;
+        row.push({ probs, topKey, confidence: topP });
+      } else if (segSchema === 'binary' && a) {
+        const pYes = typeof a.noul === 'number' ? a.noul : (a.probabilities && a.probabilities.yes) || 0;
+        const conf = Math.max(pYes, 1 - pYes);
+        confSum += conf;
+        count++;
+        row.push({
+          probs: { yes: pYes, no: 1 - pYes },
+          topKey: pYes >= 0.5 ? 'yes' : 'no',
+          pYes,
+          confidence: conf
+        });
+      }
+    }
+    grid.push(row);
+  }
+
+  lastSegResults = grid;
+  const meanConf = count > 0 ? (confSum / count) * 100 : 0;
+  document.getElementById('statConfidence').textContent = `${meanConf.toFixed(1)}%`;
+
+  renderSegmentationOverlay();
+  renderSegClassSummary(classTotals);
+  renderCellInspector(hoveredCell.r, hoveredCell.c);
+}
+
+function renderSegmentationOverlay() {
+  const W = 480, H = 360;
+  overlayCtx.clearRect(0, 0, W, H);
+  if (!lastSegResults || overlayStyle === 'raw') return;
+
+  const cellW = W / 6;
+  const cellH = H / 6;
+
+  if (overlayStyle === 'smooth') {
+    // Render 6x6 color matrix to tiny offscreen canvas and upscale smoothly with bilinear filtering
+    const small = document.createElement('canvas');
+    small.width = 6;
+    small.height = 6;
+    const sctx = small.getContext('2d');
+    const imgData = sctx.createImageData(6, 6);
+
+    for (let r = 0; r < 6; r++) {
+      for (let c = 0; c < 6; c++) {
+        const cell = lastSegResults[r][c];
+        const idx = (r * 6 + c) * 4;
+        if (segSchema === 'multi') {
+          // Blend RGB weighted by class probabilities
+          let rr = 0, gg = 0, bb = 0;
+          CLASSES.forEach(cls => {
+            const p = (cell.probs && cell.probs[cls.key]) || 0;
+            rr += cls.rgb[0] * p;
+            gg += cls.rgb[1] * p;
+            bb += cls.rgb[2] * p;
+          });
+          imgData.data[idx] = Math.round(rr);
+          imgData.data[idx + 1] = Math.round(gg);
+          imgData.data[idx + 2] = Math.round(bb);
+          imgData.data[idx + 3] = Math.round(115 + 55 * cell.confidence);
+        } else {
+          const p = cell.pYes || 0;
+          imgData.data[idx] = 16;
+          imgData.data[idx + 1] = 185;
+          imgData.data[idx + 2] = 129;
+          imgData.data[idx + 3] = p > 0.18 ? Math.round(p * 205) : 0;
+        }
+      }
+    }
+    sctx.putImageData(imgData, 0, 0);
+    overlayCtx.save();
+    overlayCtx.imageSmoothingEnabled = true;
+    overlayCtx.imageSmoothingQuality = 'high';
+    overlayCtx.drawImage(small, 0, 0, W, H);
+    overlayCtx.restore();
+  }
+
+  // Draw crisp 6x6 grid lines and cell badges
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 6; c++) {
+      const cell = lastSegResults[r][c];
+      const x = c * cellW;
+      const y = r * cellH;
+
+      if (overlayStyle === 'grid') {
+        if (segSchema === 'multi') {
+          const cls = CLASS_MAP[cell.topKey] || CLASSES[0];
+          overlayCtx.fillStyle = `rgba(${cls.rgb[0]}, ${cls.rgb[1]}, ${cls.rgb[2]}, ${0.28 + 0.35 * cell.confidence})`;
+          overlayCtx.fillRect(x, y, cellW, cellH);
+        } else {
+          const p = cell.pYes || 0;
+          if (p >= 0.25) {
+            overlayCtx.fillStyle = `rgba(16, 185, 129, ${0.15 + 0.65 * p})`;
+            overlayCtx.fillRect(x, y, cellW, cellH);
+          }
+        }
+      }
+
+      const isHovered = hoveredCell.r === r && hoveredCell.c === c;
+      overlayCtx.strokeStyle = isHovered ? '#38bdf8' : 'rgba(255,255,255,0.22)';
+      overlayCtx.lineWidth = isHovered ? 2 : 1;
+      overlayCtx.strokeRect(x + 0.5, y + 0.5, cellW - 1, cellH - 1);
+
+      // Compact label + probability inside each cell
+      overlayCtx.font = '600 10px "JetBrains Mono", monospace';
+      if (segSchema === 'multi') {
+        const cls = CLASS_MAP[cell.topKey] || CLASSES[0];
+        const pct = Math.round(cell.confidence * 100);
+        overlayCtx.fillStyle = 'rgba(9, 10, 15, 0.72)';
+        overlayCtx.fillRect(x + 4, y + 4, 68, 16);
+        overlayCtx.fillStyle = cls.color;
+        overlayCtx.fillText(`${cls.key} ${pct}%`, x + 8, y + 15);
+      } else {
+        const pct = Math.round((cell.pYes || 0) * 100);
+        overlayCtx.fillStyle = 'rgba(9, 10, 15, 0.72)';
+        overlayCtx.fillRect(x + 4, y + 4, 44, 16);
+        overlayCtx.fillStyle = pct >= 50 ? '#10b981' : '#94a3b8';
+        overlayCtx.fillText(`${pct}%`, x + 8, y + 15);
+      }
+    }
+  }
+}
+
+function renderSegClassSummary(classTotals) {
+  const container = document.getElementById('segClassBars');
+  if (segSchema === 'multi') {
+    document.getElementById('segSummaryHeader').textContent = 'Scene Class Coverage (36 Spatial Cells)';
+    container.innerHTML = CLASSES.map(cls => {
+      const frac = ((classTotals[cls.key] || 0) / 36) * 100;
+      return `
+        <div class="bar-row">
+          <div class="bar-name"><span class="swatch" style="background:${cls.color}"></span>${cls.name}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.min(100, frac).toFixed(1)}%; background:${cls.color}"></div></div>
+          <div class="bar-pct">${frac.toFixed(1)}%</div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    document.getElementById('segSummaryHeader').textContent = `Target Presence ("${binaryTarget}") by Row`;
+    const rowsHtml = [];
+    for (let r = 0; r < 6; r++) {
+      let rowAvg = 0;
+      for (let c = 0; c < 6; c++) {
+        rowAvg += (lastSegResults[r][c].pYes || 0);
+      }
+      const pct = (rowAvg / 6) * 100;
+      rowsHtml.push(`
+        <div class="bar-row">
+          <div class="bar-name">Row ${r + 1} (r${r}c0..r${r}c5)</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct.toFixed(1)}%; background:#10b981"></div></div>
+          <div class="bar-pct">${pct.toFixed(1)}%</div>
+        </div>
+      `);
+    }
+    container.innerHTML = rowsHtml.join('');
+  }
+}
+
+function renderCellInspector(r, c) {
+  if (!lastSegResults || !lastSegResults[r] || !lastSegResults[r][c]) return;
+  const cell = lastSegResults[r][c];
+  document.getElementById('cellInspectorCoords').textContent = `r${r}c${c} (Row ${r + 1}, Col ${c + 1})`;
+  const container = document.getElementById('cellInspectorBars');
+
+  if (segSchema === 'multi') {
+    container.innerHTML = CLASSES.map(cls => {
+      const p = ((cell.probs && cell.probs[cls.key]) || 0) * 100;
+      return `
+        <div class="bar-row">
+          <div class="bar-name"><span class="swatch" style="background:${cls.color}"></span>${cls.name}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${p.toFixed(1)}%; background:${cls.color}"></div></div>
+          <div class="bar-pct">${p.toFixed(1)}%</div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    const pYes = (cell.pYes || 0) * 100;
+    const pNo = 100 - pYes;
+    container.innerHTML = `
+      <div class="bar-row">
+        <div class="bar-name"><span class="swatch" style="background:#10b981"></span>Present (yes)</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pYes.toFixed(1)}%; background:#10b981"></div></div>
+        <div class="bar-pct">${pYes.toFixed(1)}%</div>
+      </div>
+      <div class="bar-row">
+        <div class="bar-name"><span class="swatch" style="background:#64748b"></span>Absent (no)</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pNo.toFixed(1)}%; background:#64748b"></div></div>
+        <div class="bar-pct">${pNo.toFixed(1)}%</div>
+      </div>
+    `;
+  }
+}
+
+function processRadarResponse(answers) {
+  overlayCtx.clearRect(0, 0, 480, 360);
+  let confSum = 0, count = 0;
+  Object.values(answers).forEach(a => {
+    if (a && typeof a.confidence === 'number') { confSum += a.confidence; count++; }
+    else if (a && typeof a.noul === 'number') { confSum += Math.max(a.noul, 1 - a.noul); count++; }
+  });
+  document.getElementById('statConfidence').textContent = count ? `${((confSum / count) * 100).toFixed(1)}%` : '--%';
+
+  // 1. Choice sensors
+  const choiceKeys = ['environment', 'lighting', 'primary_focus'];
+  document.getElementById('radarChoiceBars').innerHTML = choiceKeys.map(k => {
+    const a = answers[k] || {};
+    const top = a.choice || '--';
+    const pct = ((a.confidence || 0) * 100).toFixed(1);
+    return `
+      <div class="bar-row">
+        <div class="bar-name">${k}: <strong style="color:var(--text-primary)">${top}</strong></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:#38bdf8"></div></div>
+        <div class="bar-pct">${pct}%</div>
+      </div>
+    `;
+  }).join('');
+
+  // 2. Score sensors
+  const scoreKeys = ['scene_activity', 'visual_complexity'];
+  document.getElementById('radarScoreBars').innerHTML = scoreKeys.map(k => {
+    const a = answers[k] || {};
+    const sc = typeof a.score === 'number' ? a.score : 0;
+    const pct = Math.min(100, Math.max(0, ((sc + 1) / 4) * 100)).toFixed(1);
+    return `
+      <div class="bar-row">
+        <div class="bar-name">${k}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:#f59e0b"></div></div>
+        <div class="bar-pct">${(sc + 1).toFixed(2)}/4</div>
+      </div>
+    `;
+  }).join('');
+
+  // 3. Object noul sensors
+  const objKeys = ['has_vehicle', 'has_person', 'has_vegetation', 'has_laptop_screen', 'has_animal_dog', 'has_mug_cup'];
+  document.getElementById('radarObjectBars').innerHTML = objKeys.map(k => {
+    const a = answers[k] || {};
+    const p = ((typeof a.noul === 'number' ? a.noul : 0) * 100);
+    const col = p >= 50 ? '#10b981' : '#64748b';
+    return `
+      <div class="bar-row">
+        <div class="bar-name">${k.replace('has_', '')}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${p.toFixed(1)}%; background:${col}"></div></div>
+        <div class="bar-pct">${p.toFixed(1)}%</div>
+      </div>
+    `;
+  }).join('');
+
+  // 4. Spatial zone noul sensors
+  const zoneKeys = ['zone_top_sky', 'zone_left_subject', 'zone_center_subject', 'zone_right_subject', 'zone_bottom_ground'];
+  document.getElementById('radarZoneBars').innerHTML = zoneKeys.map(k => {
+    const a = answers[k] || {};
+    const p = ((typeof a.noul === 'number' ? a.noul : 0) * 100);
+    const col = p >= 50 ? '#38bdf8' : '#64748b';
+    return `
+      <div class="bar-row">
+        <div class="bar-name">${k.replace('zone_', '')}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${p.toFixed(1)}%; background:${col}"></div></div>
+        <div class="bar-pct">${p.toFixed(1)}%</div>
+      </div>
+    `;
+  }).join('');
+}
+
+overlayCanvas.addEventListener('mousemove', (e) => {
+  const rect = overlayCanvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const c = Math.min(5, Math.max(0, Math.floor((x / rect.width) * 6)));
+  const r = Math.min(5, Math.max(0, Math.floor((y / rect.height) * 6)));
+  if (r !== hoveredCell.r || c !== hoveredCell.c) {
+    hoveredCell = { r, c };
+    if (currentMode === 'seg' && lastSegResults) {
+      renderSegmentationOverlay();
+      renderCellInspector(r, c);
+    }
+  }
+});
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('modeSegBtn').classList.toggle('active', mode === 'seg');
+  document.getElementById('modeRadarBtn').classList.toggle('active', mode === 'radar');
+  document.getElementById('segControls').style.display = mode === 'seg' ? 'flex' : 'none';
+  document.getElementById('segTelemetryView').style.display = mode === 'seg' ? 'flex' : 'none';
+  document.getElementById('radarTelemetryView').style.display = mode === 'radar' ? 'flex' : 'none';
+  document.getElementById('stageTitle').textContent = mode === 'seg'
+    ? 'Visual Input + 1-Step Diffusion Mask'
+    : 'Visual Input + 16-Sensor System-1 Radar';
+  runEvaluation();
+}
+
+function setSegSchema(schema) {
+  segSchema = schema;
+  document.getElementById('schemaMultiBtn').classList.toggle('active', schema === 'multi');
+  document.getElementById('schemaBinaryBtn').classList.toggle('active', schema === 'binary');
+  document.getElementById('binaryTargetRow').style.display = schema === 'binary' ? 'flex' : 'none';
+  runEvaluation();
+}
+
+function setBinaryTarget(target, btnEl) {
+  binaryTarget = target;
+  document.getElementById('customTargetInput').value = target;
+  document.querySelectorAll('#binaryTargetRow .chip').forEach(b => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+  runEvaluation();
+}
+
+function setOverlayStyle(style) {
+  overlayStyle = style;
+  document.getElementById('viewSmoothBtn').classList.toggle('active', style === 'smooth');
+  document.getElementById('viewGridBtn').classList.toggle('active', style === 'grid');
+  document.getElementById('viewRawBtn').classList.toggle('active', style === 'raw');
+  renderSegmentationOverlay();
+}
+
+function loadPreset(preset) {
+  stopWebcam();
+  currentPreset = preset;
+  document.getElementById('presetCrosswalkBtn').classList.toggle('active', preset === 'crosswalk');
+  document.getElementById('presetDeskBtn').classList.toggle('active', preset === 'desk');
+  document.getElementById('presetParkBtn').classList.toggle('active', preset === 'park');
+  drawPresetScene(preset);
+  runEvaluation();
+}
+
+function handleFileUpload(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  stopWebcam();
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      baseCtx.clearRect(0, 0, 480, 360);
+      baseCtx.drawImage(img, 0, 0, 480, 360);
+      runEvaluation();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function toggleWebcam() {
+  const btn = document.getElementById('webcamBtn');
+  const video = document.getElementById('webcamVideo');
+  if (webcamStream) {
+    stopWebcam();
+    return;
+  }
+  try {
+    webcamStream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 }, audio: false });
+    video.srcObject = webcamStream;
+    video.style.display = 'block';
+    btn.classList.add('active');
+    btn.textContent = 'Stop Webcam';
+    webcamTimer = setInterval(() => {
+      if (!isRunning && webcamStream) {
+        baseCtx.drawImage(video, 0, 0, 480, 360);
+        runEvaluation();
+      }
+    }, 900);
+  } catch (err) {
+    document.getElementById('statusText').textContent = `Webcam unavailable: ${err.message}`;
+  }
+}
+
+function stopWebcam() {
+  if (webcamTimer) { clearInterval(webcamTimer); webcamTimer = null; }
+  if (webcamStream) {
+    webcamStream.getTracks().forEach(t => t.stop());
+    webcamStream = null;
+  }
+  const video = document.getElementById('webcamVideo');
+  video.style.display = 'none';
+  const btn = document.getElementById('webcamBtn');
+  btn.classList.remove('active');
+  btn.textContent = 'Webcam';
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  drawPresetScene('crosswalk');
+  runEvaluation();
+});
+</script>
+</body>
+</html>

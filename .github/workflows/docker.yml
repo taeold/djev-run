@@ -9,6 +9,7 @@ on:
       - 'snake.html'
       - 'dino.html'
       - 'tetris.html'
+      - 'vision.html'
       - 'ultra_fast_entrypoint.sh'
 
 permissions:
@@ -36,6 +37,7 @@ jobs:
           cp snake.html djev-spark/server/snake.html
           cp dino.html djev-spark/server/dino.html
           if [ -f tetris.html ]; then cp tetris.html djev-spark/server/tetris.html; fi
+          if [ -f vision.html ]; then cp vision.html djev-spark/server/vision.html; fi
           cp ultra_fast_entrypoint.sh djev-spark/entrypoint.sh
           cat > patch_server.py << 'EOF'
           import pathlib
@@ -53,6 +55,8 @@ jobs:
               "    \"/dino.html\": \"dino.html\",\n"
               "    \"/tetris\": \"tetris.html\",\n"
               "    \"/tetris.html\": \"tetris.html\",\n"
+              "    \"/vision\": \"vision.html\",\n"
+              "    \"/vision.html\": \"vision.html\",\n"
               "    \"/playground\": \"playground.html\",\n"
               "    \"/playground.html\": \"playground.html\",\n"
               "    \"/walk\": \"walk.html\",\n"
