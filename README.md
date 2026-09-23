@@ -1,18 +1,14 @@
 # djev-run
 
 Serve DiffusionGemma-Jev (`djev`) on a TypeSafe AI compatible API on Cloud Run
-with an NVIDIA RTX PRO 6000 Blackwell GPU. Built on
-[`mmastrac/djev`](https://github.com/mmastrac/djev) and
-[`mmastrac/djev-spark`](https://github.com/mmastrac/djev-spark)
-([`@mmastrac`](https://x.com/mmastrac/status/2100373761195401724),
-[`vllm#57250`](https://github.com/vllm-project/vllm/pull/57250),
-[`vllm#58216`](https://github.com/vllm-project/vllm/pull/58216),
-[`vllm#58226`](https://github.com/vllm-project/vllm/pull/58226)), with built-in
-browser demos inspired by
-[`mizorewww/laya-coreml`](https://github.com/mizorewww/laya-coreml) (`/snake`),
-[`virajbhartiya/laya-vs-jev`](https://github.com/virajbhartiya/laya-vs-jev)
-(`/dino`), and [`trungdq88/jev-tetris`](https://github.com/trungdq88/jev-tetris)
-(`/tetris`).
+with an NVIDIA RTX PRO 6000 Blackwell GPU, built on
+[mmastrac/djev](https://github.com/mmastrac/djev).
+
+Built-in demo apps, inspired by:
+
+- `/snake`: [mizorewww/laya-coreml](https://github.com/mizorewww/laya-coreml)
+- `/dino`: [virajbhartiya/laya-vs-jev](https://github.com/virajbhartiya/laya-vs-jev)
+- `/tetris`: [trungdq88/jev-tetris](https://github.com/trungdq88/jev-tetris)
 
 <img width="640" height="360" alt="djev snake" src="https://github.com/user-attachments/assets/2e9a5321-f8a9-4734-b6f2-4d6f47193390" />
 
@@ -58,7 +54,7 @@ gcloud beta run deploy djev-dgemma \
   --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=5,periodSeconds=2,timeoutSeconds=2,failureThreshold=120 \
   --set-env-vars="MODEL=/mnt/gcs/dgemma,CANVAS=128,MAX_SEQS=32,MAX_MODEL_LEN=4096,GPU_UTIL=0.40,KV_CACHE_GB=2,ATTN=TRITON_ATTN,TEST_PAGE=1,COPY_TO_SHM=1,ENFORCE_EAGER=1,DISABLE_MM=1,TORCH_COMPILE_DISABLE=1,VLLM_WORKER_MULTIPROC_METHOD=fork,VLLM_UF_EAGER_ALL=1,VLLM_FLASHINFER_MOE_BACKEND=masked_gemm,CUDA_MODULE_LOADING=LAZY"
 
-# --image=ghcr.io/taeold/djev-run:latest: prebuilt from github.com/mmastrac/djev-spark (upstream does not publish a registry image)
+# --image=ghcr.io/taeold/djev-run:latest: prebuilt from github.com/mmastrac/djev (upstream does not publish a registry image)
 # --no-gpu-zonal-redundancy: required for standard regional RTX PRO 6000 quota
 # --no-cpu-throttling: keeps all 20 vCPUs active during weight loading and vLLM scheduling
 # --network=default --subnet=default --vpc-egress=all-traffic: streams weights from GCS over Google internal networking (~1.05 GiB/s)
@@ -70,43 +66,22 @@ gcloud beta run deploy djev-dgemma \
 # DISABLE_MM=1: skips SigLIP vision/video encoder profiling for text-only evaluation
 ```
 
-### Step 3: Play the Built-in Snake, Chrome Dino, and Tetris Demos (Zero Dependencies)
+### Step 3: Open the Built-in Demos
 
-`snake.html` (`/snake`), `dino.html` (`/dino`), and `tetris.html` (`/tetris`) are
-standalone HTML files with zero external dependencies. They call
-`POST /v1/systemone` directly from the browser via `fetch()`:
+All three demos are standalone HTML files with zero external dependencies that
+call `POST /v1/systemone` directly from the browser via `fetch()`:
 
--   **Snake Arena (`/snake`)**: Open `https://<your-cloud-run-url>/snake` in
-    your browser (12x12 grid with flood-fill safety analysis and live move
-    probability bars).
--   **Chrome T-Rex Dino Arena (`/dino`)**: Open
-    `https://<your-cloud-run-url>/dino` in your browser (`unassisted` raw
-    `/v1/systemone` mode with 3-way pipelined in-flight requests and
-    `model + live shield` mode, 2x HiDPI Chromium sprites, exact two-stage
-    pixel-box collision checks, and unthrottled 60 FPS Web Worker physics loop).
--   **Tetris Arena (`/tetris`)**: Open `https://<your-cloud-run-url>/tetris` in
-    your browser (10x20 Tetris board adapted from
-    [`trungdq88/jev-tetris`](https://github.com/trungdq88/jev-tetris) with
-    single-pass 4-question speculative fan-out over `placement`, `strategy`,
-    `board_health`, and `next_piece_fits`, plus next-piece `/v1/systemone`
-    prefetching for 0 ms inter-piece wait at 60 FPS).
--   **Extractive Spans (`span` / `spans`), Constrained Readout & Fused Sampler**:
-    Built on [`mmastrac/djev`](https://github.com/mmastrac/djev)
-    (`span-answer-type`),
-    [`vllm-project/vllm#58216`](https://github.com/vllm-project/vllm/pull/58216)
-    (`diffusion_constrained` + `diffusion_pinned`), and
-    [`vllm-project/vllm#58226`](https://github.com/vllm-project/vllm/pull/58226)
-    (one-pass Triton `_row_stats_kernel` sampler, `49/49` `span_battery.py` in
-    `10.7s`).
+- Snake: `https://<your-cloud-run-url>/snake`
+- Chrome Dino: `https://<your-cloud-run-url>/dino`
+- Tetris: `https://<your-cloud-run-url>/tetris`
 
 --------------------------------------------------------------------------------
 
 ## Use with Vercel AI SDK (Optional)
 
-Because `djev-run` implements the `/v1/systemone` endpoint contract (`noul` /
-`boolean`, `choice`, `score`, `span`, and `spans`), you can also point
-`@ai-sdk/typesafe-ai` at your Cloud Run URL from Node.js or TypeScript
-(`index.ts`):
+Because `djev-run` implements the `/v1/systemone` endpoint contract, you can
+also point `@ai-sdk/typesafe-ai` at your Cloud Run URL from Node.js or
+TypeScript (`index.ts`):
 
 ```typescript
 import { createTypeSafeAi } from '@ai-sdk/typesafe-ai';
@@ -147,6 +122,22 @@ const result = await triage(
   'I was charged twice and my account is locked',
 );
 console.log(result);
+// {
+//   department: {
+//     type: 'choice',
+//     choice: 'billing',
+//     probabilities: { billing: 0.9988, support: 0.0012 }
+//   },
+//   severity: {
+//     type: 'score',
+//     score: 1.9995,
+//     probabilities: { '0': 0.0002, '1': 0.0001, '2': 0.9997 }
+//   },
+//   requestsRefund: {
+//     type: 'boolean',
+//     probability: 0.9928
+//   }
+// }
 ```
 
 ```bash
@@ -156,23 +147,31 @@ CLOUD_RUN_URL="https://<your-cloud-run-url>" TYPESAFE_AI_API_KEY="$(gcloud auth 
 
 --------------------------------------------------------------------------------
 
-## Performance & JevBench v1.3.0 (`N = 231`)
+## Performance
 
--   **Cold start from zero instances**: **47.5s** (`29.7s` engine init with
-    `VLLM_ENABLE_V1_MULTIPROCESSING=0` in-process vLLM engine + 32-worker
-    parallel rootfs prefetch + 2-shard background `/dev/shm` streaming, down
-    from `4m 05s` baseline)
--   **Single-request latency**: **~61 ms server / ~116 ms WAN RTT** (`steps=1, samples=1`;
-    **~121 ms p50 WAN RTT** with `samples="auto"`)
--   **JevBench v1.3.0 (`N = 231` public suite, `diffusion_constrained=True`)**:
-    -   **Fast Mode (`steps=1, samples=1`)**: **81.39% Overall Accuracy**
-        (**100.00% Easy**, **95.83% Standard**, **63.96% Hard**), **0.2739 Mean
-        Brier**, **0.0963 ECE**, **80.74 Calibration Score**, **79.29
-        Intelligence Score**, **77.34 Composite Score**.
-    -   **Auto Mode (`steps=1, samples="auto"`)**: **81.82% Overall Accuracy**
-        (**100.00% Easy**, **95.83% Standard**, **64.86% Hard**), **0.2687 Mean
-        Brier**, **0.0989 ECE**, **80.22 Calibration Score**, **79.70
-        Intelligence Score**, **77.01 Composite Score**.
+- Cold start from zero instances: ~47.5s (down from 4m 05s baseline)
+- Median response time: 61 ms on server, 117 ms end-to-end (`steps=1, samples=1`; 121 ms end-to-end with `samples="auto"`)
+- Batch throughput: ~100-123 requests/sec at `concurrency=32`
+
+[JevBench](https://benchmarkheaven.com/jev-models) v1.3.0 (`N = 231` public suite):
+
+| Configuration | Overall Accuracy | Composite Score | Median Response Time |
+| --- | --- | --- | --- |
+| `djev-run (steps=1, samples=1)` | 81.4% | 73.4 | 117 ms |
+| `djev-run (steps=1, samples="auto")` | 81.8% | 73.5 | 121 ms |
+| `api.djev.dev` | 81.8% | 73.0 | 237 ms |
+
+To reach a 47.5-second cold start on Cloud Run, the container streams the 17.5 GB
+`safetensors` weights from GCS into `/dev/shm` RAM in the background (`1.05
+GiB/s`) while Python imports `torch` and `vllm`, forks `EngineCore` from
+`APIServer` (`VLLM_WORKER_MULTIPROC_METHOD=fork`) so modules are not imported
+twice, disables unused SigLIP vision profiling (`DISABLE_MM=1`), and skips
+`torch.compile`, CUDA graph capture, and redundant memory-profiling passes
+(`ENFORCE_EAGER=1`, `TORCH_COMPILE_DISABLE=1`, `--kv-cache-memory`).
+
+Empirical benchmarks on Cloud Run with the RTX PRO 6000 confirmed:
+- Streaming over VPC egress from GCS FUSE into `/dev/shm` (~47.5s) outperforms baking weights into the container image (80-115s), avoiding heavy overlay filesystem read overhead and long image import operations.
+- `--cpu-boost` is omitted because host CPU frequency scaling under boosted allocation slows down 20 vCPU container initialization on GPU nodes (73-75s vs 47.5s).
 
 --------------------------------------------------------------------------------
 
