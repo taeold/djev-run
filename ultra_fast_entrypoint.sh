@@ -111,6 +111,23 @@ if "while os.path.exists('/dev/shm/dgemma')" not in s:
     )
     p.write_text(s)
 
+# Fallback to standard library base64 if pybase64 is not installed
+try:
+    import pybase64
+except ImportError:
+    import base64
+    sys.modules["pybase64"] = base64
+
+sp = pathlib.Path("/opt/dgemma/structured_server.py")
+if sp.exists():
+    ss = sp.read_text()
+    if "import pybase64 as base64" in ss:
+        sp.write_text(ss.replace(
+            "import pybase64 as base64",
+            "try:\n    import pybase64 as base64\nexcept ImportError:\n    import base64",
+            1
+        ))
+
 sys.path.insert(0, "/opt/dgemma")
 import structured_server as S
 
