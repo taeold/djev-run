@@ -26,6 +26,7 @@ if [ -d "/opt/dgemma/vllm_overlay" ]; then
 fi
 python3 -m compileall -f -q \
   /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/diffusion_gemma.py \
+  /usr/local/lib/python3.12/dist-packages/vllm/v1/sample/ops/diffusion_sampler.py \
   /usr/local/lib/python3.12/dist-packages/vllm/utils/diffusion.py \
   /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/diffusion_scheduler.py \
   /opt/dgemma/structured_server.py 2>/dev/null || true
@@ -113,6 +114,9 @@ if os.path.exists("/opt/dgemma/snake.html"):
 if os.path.exists("/opt/dgemma/dino.html"):
     S.PAGES["/dino"] = "dino.html"
     S.PAGES["/dino.html"] = "dino.html"
+if os.path.exists("/opt/dgemma/tetris.html"):
+    S.PAGES["/tetris"] = "tetris.html"
+    S.PAGES["/tetris.html"] = "tetris.html"
 
 S.ARGS = type("Args", (), {
     "upstream": "http://127.0.0.1:8000",

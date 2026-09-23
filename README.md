@@ -63,21 +63,29 @@ gcloud beta run deploy djev-dgemma \
 # DISABLE_MM=1: skips SigLIP vision/video encoder profiling for text-only evaluation
 ```
 
-### Step 3: Play the Built-in Snake and Chrome Dino Demos (Zero Dependencies)
+### Step 3: Play the Built-in Snake, Chrome Dino, and Tetris Demos (Zero Dependencies)
 
-`snake.html` (`/snake`) and `dino.html` (`/dino`) are standalone HTML files with
-zero external dependencies. They call `POST /v1/systemone` directly from the
-browser via `fetch()`:
+`snake.html` (`/snake`), `dino.html` (`/dino`), and `tetris.html` (`/tetris`) are
+standalone HTML files with zero external dependencies. They call
+`POST /v1/systemone` directly from the browser via `fetch()`:
 
 -   **Snake Arena**: Open `https://<your-cloud-run-url>/snake` in your browser.
 -   **Chrome T-Rex Dino Arena**: Open `https://<your-cloud-run-url>/dino` in
-    your browser (`unassisted` raw `/v1/systemone` mode and `model + live shield`
-    mode, 2x HiDPI Chromium sprites, exact two-stage pixel-box collision checks,
-    and 60 FPS Web Worker physics loop).
--   **Extractive Spans (`span` / `spans`) & Constrained Readout**: Built on
-    [`mmastrac/djev`](https://github.com/mmastrac/djev) (`span-answer-type`) and
+    your browser (`unassisted` raw `/v1/systemone` mode with 3-way pipelined
+    in-flight requests and `model + live shield` mode, 2x HiDPI Chromium
+    sprites, exact two-stage pixel-box collision checks, and unthrottled 60 FPS
+    Web Worker physics loop).
+-   **Tetris Arena**: Open `https://<your-cloud-run-url>/tetris` in your browser
+    (full 10x20 SRS Tetris board with candidate placement ranking via
+    `/v1/systemone`).
+-   **Extractive Spans (`span` / `spans`), Constrained Readout & Fused Sampler**:
+    Built on [`mmastrac/djev`](https://github.com/mmastrac/djev)
+    (`span-answer-type`),
     [`vllm-project/vllm#58216`](https://github.com/vllm-project/vllm/pull/58216)
-    (`diffusion_constrained` + `diffusion_pinned`).
+    (`diffusion_constrained` + `diffusion_pinned`), and
+    [`vllm-project/vllm#58226`](https://github.com/vllm-project/vllm/pull/58226)
+    (one-pass Triton `_row_stats_kernel` sampler, `49/49` `span_battery.py` in
+    `10.7s`).
 
 --------------------------------------------------------------------------------
 

@@ -1,0 +1,1353 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jev plays Tetris (djev-run)</title>
+  <meta name="description" content="TypeSafe System One (djev-dgemma) chooses every Tetris move from placements the code enumerates via POST /v1/systemone." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect x='1' y='1' width='6' height='6' fill='%233fd6f0'/><rect x='9' y='1' width='6' height='6' fill='%23f5d547'/><rect x='1' y='9' width='6' height='6' fill='%23b565f2'/><rect x='9' y='9' width='6' height='6' fill='%23f26b6b'/></svg>" />
+  <style>
+    :root {
+      --bg: #0e1118;
+      --panel: #161b26;
+      --panel-2: #1d2330;
+      --border: #2a3242;
+      --text: #e7ecf5;
+      --muted: #8f9bb3;
+      --accent: #6ea8ff;
+      --accent-2: #3fd6f0;
+      --good: #5fe38a;
+      --warn: #f5d547;
+      --bad: #f26b6b;
+      --radius: 10px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(1200px 600px at 20% -10%, #1b2436 0%, var(--bg) 60%);
+      color: var(--text);
+      font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { font-family: var(--mono); font-size: 0.9em; background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      padding: 24px 28px 8px;
+      flex-wrap: wrap;
+    }
+    .top h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: -0.01em; }
+    .sub { margin: 0; color: var(--muted); max-width: 680px; }
+
+    .mode {
+      display: flex;
+      gap: 14px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .mode label { display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      gap: 24px;
+      padding: 16px 28px 28px;
+      align-items: start;
+    }
+
+    .board-col { display: flex; flex-direction: column; gap: 12px; align-items: center; position: sticky; top: 16px; }
+    .board-wrap { position: relative; }
+    canvas#board {
+      width: 300px;
+      height: 600px;
+      background: #0a0d14;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+      image-rendering: pixelated;
+    }
+    .overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center; text-align: center;
+      background: rgba(10, 13, 20, 0.78);
+      border-radius: 8px;
+      font-size: 22px; font-weight: 700;
+      padding: 20px;
+    }
+    .hidden { display: none !important; }
+
+    .status-row { min-height: 22px; width: 300px; }
+    .status { color: var(--muted); font-size: 14px; }
+    .status.thinking { color: var(--accent-2); }
+    .status.error { color: var(--bad); }
+
+    .controls { display: flex; gap: 8px; align-items: center; width: 300px; flex-wrap: wrap; }
+    button, select {
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font: inherit;
+      cursor: pointer;
+    }
+    button:hover:not(:disabled), select:hover:not(:disabled) { border-color: var(--accent); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #0b1220; font-weight: 600; }
+    .speed { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; margin-left: auto; }
+    .speed input { width: 90px; }
+
+    .side-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+    }
+    .card h2 { margin: 0 0 10px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+
+    .key-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .key-row input {
+      flex: 1;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 8px 10px;
+      font-family: var(--mono);
+      font-size: 13px;
+      min-width: 180px;
+    }
+    .key-row input:focus { outline: none; border-color: var(--accent); }
+    .hint { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+    .key-status { font-size: 13px; margin-top: 6px; min-height: 18px; }
+    .key-status.ok { color: var(--good); }
+    .key-status.bad { color: var(--bad); }
+
+    .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+    .stat { display: flex; flex-direction: column; gap: 2px; }
+    .stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .stat span:not(.label) { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    canvas#next { background: #0a0d14; border: 1px solid var(--border); border-radius: 6px; width: 80px; height: 50px; }
+
+    .muted { color: var(--muted); }
+    #chosen { margin: 0 0 10px; }
+    #readsNote { margin: 0 0 10px; font-size: 13px; }
+    #chosen strong { color: var(--text); }
+    .desc { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .desc span { background: var(--panel-2); border-radius: 6px; padding: 2px 8px; font-size: 12px; color: var(--muted); }
+    .desc span b { color: var(--text); font-weight: 500; }
+
+    .bar-list { display: flex; flex-direction: column; gap: 6px; }
+    .bar-row { display: grid; grid-template-columns: 240px 1fr 52px; gap: 10px; align-items: center; font-size: 13px; }
+    .bar-row .name { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar-row.chosen .name { color: var(--text); font-weight: 600; }
+    .bar { position: relative; height: 12px; background: var(--panel-2); border-radius: 6px; overflow: hidden; }
+    .bar-fill { height: 100%; background: var(--accent); border-radius: 6px; transition: width 0.25s ease; }
+    .bar-fill.noul { background: var(--good); }
+    .bar-value { font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
+    .bar .bar-value { position: absolute; right: 6px; top: -3px; font-size: 11px; }
+
+    .read { margin-bottom: 12px; }
+    .read:last-child { margin-bottom: 0; }
+    .read-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    .gauge { height: 14px; background: linear-gradient(90deg, var(--good), var(--warn), var(--bad)); border-radius: 7px; position: relative; }
+    .gauge-fill {
+      position: absolute; top: -3px; width: 4px; height: 20px; background: #fff; border-radius: 2px;
+      left: 0; transition: left 0.3s ease; box-shadow: 0 0 0 2px rgba(0,0,0,0.4);
+    }
+    .gauge-legend { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+    details.card summary { cursor: pointer; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .inspector-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+    pre {
+      margin: 0;
+      background: #0a0d14;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.4;
+      max-height: 360px;
+      overflow: auto;
+      white-space: pre;
+    }
+
+    .error {
+      background: rgba(242, 107, 107, 0.12);
+      border: 1px solid var(--bad);
+      color: #ffb3b3;
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: 14px;
+    }
+
+    .foot { padding: 8px 28px 24px; color: var(--muted); font-size: 13px; }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .board-col { position: static; }
+      .stats { grid-template-columns: repeat(3, 1fr); }
+      .inspector-grid { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 150px 1fr 48px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>Jev plays Tetris</h1>
+      <p class="sub">
+        Code enumerates every legal placement and describes the outcome in words.
+        <a href="https://docs.typesafe.ai" target="_blank" rel="noopener">Jev</a> (<code>djev-dgemma</code> on Cloud Run)
+        answers four simultaneous questions per piece (<code>choice</code>, <code>score</code>, <code>noul</code>) via <code>POST /v1/systemone</code>.
+        <a href="/dino">Dino</a> · <a href="/snake">Snake</a>
+      </p>
+    </div>
+    <div class="mode" role="radiogroup" aria-label="Who plays">
+      <label><input type="radio" name="mode" value="jev" checked /> Jev decides (/v1/systemone)</label>
+      <label><input type="radio" name="mode" value="heuristic" /> Built-in heuristic (no model)</label>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="board-col">
+      <div class="board-wrap">
+        <canvas id="board" width="300" height="600" aria-label="Tetris board"></canvas>
+        <div id="overlay" class="overlay hidden"></div>
+      </div>
+      <div class="status-row">
+        <span id="status" class="status">Ready. Press Start and Jev takes over.</span>
+      </div>
+      <div class="controls">
+        <button id="start" class="primary">Start</button>
+        <button id="pause" disabled>Pause</button>
+        <button id="reset">Reset</button>
+        <label class="speed">Speed <input id="speed" type="range" min="1" max="10" value="9" /></label>
+      </div>
+    </section>
+
+    <section class="side-col">
+      <div class="card" id="setup">
+        <h2>SystemOne Endpoint &amp; Fan-Out Config</h2>
+        <div class="key-row">
+          <input id="endpointUrl" type="text" placeholder="/v1/systemone" autocomplete="off" spellcheck="false" title="SystemOne API base URL or /v1/systemone path" />
+          <select id="candidateLimit" title="Max candidate placements per piece (A-Z choice limit is 26)">
+            <option value="12">Top 12 placements (Fast)</option>
+            <option value="16" selected>Top 16 placements (Balanced)</option>
+            <option value="26">Top 26 placements (Max A-Z)</option>
+          </select>
+          <input id="apiKey" type="password" placeholder="Optional Bearer token" autocomplete="off" spellcheck="false" style="max-width: 170px;" />
+          <button id="testKey" type="button">Ping</button>
+        </div>
+        <p class="hint">
+          Defaults to <code>window.location.origin + "/v1/systemone"</code> (<code>steps=1, samples=1</code>). Adapted from
+          <a href="https://github.com/trungdq88/jev-tetris" target="_blank" rel="noopener">trungdq88/jev-tetris</a>.
+        </p>
+        <div id="keyStatus" class="key-status ok">Connected to /v1/systemone (steps=1, samples=1).</div>
+      </div>
+
+      <div class="card stats">
+        <div class="stat"><span class="label">Score</span><span id="score">0</span></div>
+        <div class="stat"><span class="label">Lines</span><span id="lines">0</span></div>
+        <div class="stat"><span class="label">Level</span><span id="level">1</span></div>
+        <div class="stat"><span class="label">Pieces</span><span id="pieces">0</span></div>
+        <div class="stat"><span class="label">Next</span><canvas id="next" width="80" height="50"></canvas></div>
+        <div class="stat"><span class="label">Jev calls</span><span id="calls">0</span></div>
+        <div class="stat"><span class="label">p50 / Avg RTT</span><span id="latency">-</span></div>
+        <div class="stat"><span class="label">Server GPU</span><span id="serverMs">-</span></div>
+        <div class="stat"><span class="label">Input tokens</span><span id="tokens">0</span></div>
+        <div class="stat"><span class="label">Agrees w/ heur</span><span id="agree">-</span></div>
+      </div>
+
+      <div class="card" id="decision">
+        <h2 id="decisionTitle">Jev's move</h2>
+        <p id="chosen" class="muted">No move yet.</p>
+        <div class="bar-list" id="alternatives"></div>
+      </div>
+
+      <div class="card" id="reads">
+        <h2>Jev's read of the board</h2>
+        <p id="readsNote" class="muted hidden">Only filled in when Jev decides. The heuristic makes no model calls.</p>
+        <div class="read">
+          <div class="read-label">Strategy</div>
+          <div class="bar-list" id="strategy"></div>
+        </div>
+        <div class="read">
+          <div class="read-label">Board health <span id="healthValue" class="muted"></span></div>
+          <div class="gauge"><div id="healthFill" class="gauge-fill"></div></div>
+          <div id="healthLegend" class="gauge-legend"></div>
+        </div>
+        <div class="read">
+          <div class="read-label">Next piece has a clean spot</div>
+          <div class="bar"><div id="nextFitFill" class="bar-fill noul"></div><span id="nextFitValue" class="bar-value"></span></div>
+        </div>
+      </div>
+
+      <details class="card" id="inspector" open>
+        <summary>Last request and response</summary>
+        <div class="inspector-grid">
+          <div>
+            <div class="read-label">Request to <code>POST /v1/systemone</code></div>
+            <pre id="reqJson">-</pre>
+          </div>
+          <div>
+            <div class="read-label">Response</div>
+            <pre id="resJson">-</pre>
+          </div>
+        </div>
+      </details>
+
+      <div id="error" class="error hidden" role="alert"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <a href="/dino">Dino Runner</a> ·
+    <a href="/snake">Snake Autopilot</a> ·
+    <a href="https://github.com/trungdq88/jev-tetris" target="_blank" rel="noopener">trungdq88/jev-tetris</a> ·
+    <a href="https://docs.typesafe.ai/primitives/choice" target="_blank" rel="noopener">Choice primitive</a> ·
+    <a href="https://docs.typesafe.ai/patterns/fan-out" target="_blank" rel="noopener">Speculative fan-out</a>
+  </footer>
+
+  <script type="module">
+    // ---- Pure Tetris Engine (from trungdq88/jev-tetris/public/tetris.js) --------
+    const WIDTH = 10;
+    const HEIGHT = 20;
+
+    const RAW_PIECES = {
+      I: [
+        [[0, 1], [1, 1], [2, 1], [3, 1]],
+        [[2, 0], [2, 1], [2, 2], [2, 3]],
+      ],
+      O: [[[0, 0], [1, 0], [0, 1], [1, 1]]],
+      T: [
+        [[1, 0], [0, 1], [1, 1], [2, 1]],
+        [[1, 0], [1, 1], [2, 1], [1, 2]],
+        [[0, 1], [1, 1], [2, 1], [1, 2]],
+        [[1, 0], [0, 1], [1, 1], [1, 2]],
+      ],
+      S: [
+        [[1, 0], [2, 0], [0, 1], [1, 1]],
+        [[1, 0], [1, 1], [2, 1], [2, 2]],
+      ],
+      Z: [
+        [[0, 0], [1, 0], [1, 1], [2, 1]],
+        [[2, 0], [1, 1], [2, 1], [1, 2]],
+      ],
+      J: [
+        [[0, 0], [0, 1], [1, 1], [2, 1]],
+        [[1, 0], [2, 0], [1, 1], [1, 2]],
+        [[0, 1], [1, 1], [2, 1], [2, 2]],
+        [[1, 0], [1, 1], [0, 2], [1, 2]],
+      ],
+      L: [
+        [[2, 0], [0, 1], [1, 1], [2, 1]],
+        [[1, 0], [1, 1], [1, 2], [2, 2]],
+        [[0, 1], [1, 1], [2, 1], [0, 2]],
+        [[0, 0], [1, 0], [1, 1], [1, 2]],
+      ],
+    };
+
+    const PIECE_NAMES = Object.keys(RAW_PIECES);
+
+    const PIECE_COLORS = {
+      I: "#3fd6f0",
+      O: "#f5d547",
+      T: "#b565f2",
+      S: "#5fe38a",
+      Z: "#f26b6b",
+      J: "#5b8cff",
+      L: "#f4a340",
+    };
+
+    const PIECES = Object.fromEntries(
+      Object.entries(RAW_PIECES).map(([name, states]) => [
+        name,
+        states.map((cells) => {
+          const minX = Math.min(...cells.map((c) => c[0]));
+          const minY = Math.min(...cells.map((c) => c[1]));
+          const norm = cells.map(([x, y]) => [x - minX, y - minY]);
+          return {
+            cells: norm,
+            width: Math.max(...norm.map((c) => c[0])) + 1,
+            height: Math.max(...norm.map((c) => c[1])) + 1,
+          };
+        }),
+      ]),
+    );
+
+    function emptyBoard() {
+      return Array.from({ length: HEIGHT }, () => new Array(WIDTH).fill(null));
+    }
+
+    function cloneBoard(board) {
+      return board.map((row) => row.slice());
+    }
+
+    function collides(board, cells, x, y) {
+      for (const [cx, cy] of cells) {
+        const bx = x + cx;
+        const by = y + cy;
+        if (bx < 0 || bx >= WIDTH || by >= HEIGHT) return true;
+        if (by >= 0 && board[by][bx]) return true;
+      }
+      return false;
+    }
+
+    function dropY(board, cells, x, y) {
+      let cur = y;
+      while (!collides(board, cells, x, cur + 1)) cur += 1;
+      return cur;
+    }
+
+    function lockPiece(board, piece, rotation, x, y) {
+      const next = cloneBoard(board);
+      for (const [cx, cy] of PIECES[piece][rotation].cells) {
+        const by = y + cy;
+        if (by >= 0) next[by][x + cx] = piece;
+      }
+      return next;
+    }
+
+    function clearLines(board) {
+      const rows = [];
+      const kept = [];
+      board.forEach((row, i) => {
+        if (row.every((c) => c)) rows.push(i);
+        else kept.push(row.slice());
+      });
+      while (kept.length < HEIGHT) kept.unshift(new Array(WIDTH).fill(null));
+      return { board: kept, cleared: rows.length, rows };
+    }
+
+    function columnHeights(board) {
+      const heights = new Array(WIDTH).fill(0);
+      for (let x = 0; x < WIDTH; x++) {
+        for (let y = 0; y < HEIGHT; y++) {
+          if (board[y][x]) {
+            heights[x] = HEIGHT - y;
+            break;
+          }
+        }
+      }
+      return heights;
+    }
+
+    function countHoles(board) {
+      let holes = 0;
+      for (let x = 0; x < WIDTH; x++) {
+        let covered = false;
+        for (let y = 0; y < HEIGHT; y++) {
+          if (board[y][x]) covered = true;
+          else if (covered) holes += 1;
+        }
+      }
+      return holes;
+    }
+
+    function bumpiness(heights) {
+      let total = 0;
+      for (let x = 0; x < heights.length - 1; x++) total += Math.abs(heights[x] - heights[x + 1]);
+      return total;
+    }
+
+    function wells(heights, depth = 3) {
+      const found = [];
+      for (let x = 0; x < heights.length; x++) {
+        const left = x === 0 ? Infinity : heights[x - 1];
+        const right = x === heights.length - 1 ? Infinity : heights[x + 1];
+        const d = Math.min(left, right) - heights[x];
+        if (d >= depth) found.push({ column: x, depth: d });
+      }
+      return found;
+    }
+
+    function boardStats(board) {
+      const heights = columnHeights(board);
+      return {
+        heights,
+        maxHeight: Math.max(...heights),
+        aggregateHeight: heights.reduce((a, b) => a + b, 0),
+        holes: countHoles(board),
+        bumpiness: bumpiness(heights),
+        wells: wells(heights),
+      };
+    }
+
+    function heuristicScore(outcome) {
+      const s = outcome.after;
+      return (
+        -0.51 * s.aggregateHeight +
+        0.76 * outcome.linesCleared -
+        0.36 * s.holes -
+        0.18 * s.bumpiness
+      );
+    }
+
+    function enumeratePlacements(board, piece) {
+      const before = boardStats(board);
+      const seen = new Set();
+      const placements = [];
+      PIECES[piece].forEach((state, rotation) => {
+        for (let x = 0; x <= WIDTH - state.width; x++) {
+          if (collides(board, state.cells, x, 0)) continue;
+          const y = dropY(board, state.cells, x, 0);
+          const locked = lockPiece(board, piece, rotation, x, y);
+          const key = locked.map((r) => r.map((c) => (c ? "#" : ".")).join("")).join("/");
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const { board: after, cleared, rows } = clearLines(locked);
+          const stats = boardStats(after);
+          const outcome = {
+            id: `p${placements.length}`,
+            piece,
+            rotation,
+            x,
+            y,
+            cells: state.cells.map(([cx, cy]) => [x + cx, y + cy]),
+            linesCleared: cleared,
+            clearedRows: rows,
+            holesCreated: Math.max(0, stats.holes - before.holes),
+            holesRemoved: Math.max(0, before.holes - stats.holes),
+            heightDelta: stats.maxHeight - before.maxHeight,
+            before,
+            after: stats,
+            afterBoard: after,
+          };
+          outcome.heuristic = heuristicScore(outcome);
+          placements.push(outcome);
+        }
+      });
+      return placements;
+    }
+
+    function describeLines(n) {
+      return ["none", "one line", "two lines", "three lines", "four lines (a Tetris)"][n] ?? `${n} lines`;
+    }
+
+    function describeHoles(n) {
+      if (n === 0) return "none";
+      if (n === 1) return "one hole";
+      if (n === 2) return "two holes";
+      return "three or more holes";
+    }
+
+    function describeHeight(maxHeight) {
+      if (maxHeight <= 4) return "very low";
+      if (maxHeight <= 8) return "low";
+      if (maxHeight <= 12) return "medium";
+      if (maxHeight <= 15) return "high";
+      return "dangerously high, close to the top";
+    }
+
+    function describeSurface(bump) {
+      if (bump <= 4) return "flat";
+      if (bump <= 9) return "slightly uneven";
+      if (bump <= 16) return "bumpy";
+      return "very jagged";
+    }
+
+    function describeWells(list) {
+      if (list.length === 0) return "no deep wells";
+      if (list.length === 1) return `one deep well at column ${list[0].column + 1}`;
+      return `${list.length} deep wells`;
+    }
+
+    function describeWhere(placement) {
+      const xs = placement.cells.map((c) => c[0]);
+      const left = Math.min(...xs) + 1;
+      const right = Math.max(...xs) + 1;
+      return left === right ? `column ${left}` : `columns ${left}-${right}`;
+    }
+
+    function describeHeightChange(placement) {
+      const d = placement.heightDelta;
+      if (placement.linesCleared > 0 && d < 0) return "stack gets lower";
+      if (d <= 0) return "stack does not get taller";
+      if (d === 1) return "stack grows by one row";
+      return "stack grows by several rows";
+    }
+
+    function describePlacement(p) {
+      const holes = p.holesCreated;
+      return {
+        where: describeWhere(p),
+        lines_cleared: describeLines(p.linesCleared),
+        holes_created: describeHoles(holes),
+        holes_uncovered: p.holesRemoved > 0 ? describeHoles(p.holesRemoved) : "none",
+        stack_height_after: describeHeight(p.after.maxHeight),
+        height_change: describeHeightChange(p),
+        surface_after: describeSurface(p.after.bumpiness),
+        wells_after: describeWells(p.after.wells),
+      };
+    }
+
+    function boardToText(board) {
+      return board.map((row) => row.map((c) => (c ? "#" : ".")).join(""));
+    }
+
+    function makeBag(random = Math.random) {
+      const bag = PIECE_NAMES.slice();
+      for (let i = bag.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [bag[i], bag[j]] = [bag[j], bag[i]];
+      }
+      return bag;
+    }
+
+    function scoreForLines(lines, level) {
+      return [0, 100, 300, 500, 800][lines] * level;
+    }
+
+    // ---- Jev Request Builder (from trungdq88/jev-tetris/public/jev.js) ---------
+    const MODEL = "jev-latest";
+
+    const STRATEGY_OPTIONS = {
+      build_clean: "The stack is low and tidy. Keep building a flat surface and wait for a chance to clear several lines at once.",
+      clear_lines: "Lines can be cleared soon. Take clears as they come and keep the stack from growing.",
+      repair_surface: "The surface is jagged or has holes. Prefer placements that smooth it out or uncover holes, even without clearing lines.",
+      survive: "The stack is close to the top. Take any placement that lowers or does not raise the stack, even if it is ugly.",
+    };
+
+    const HEALTH_LEVELS = [
+      "Clean: low, flat stack with no holes",
+      "Fine: some unevenness or a hole or two, plenty of room",
+      "Rough: several holes or a jagged surface, room is shrinking",
+      "Critical: stack near the top, the game may be lost within a few pieces",
+    ];
+
+    function buildState({ board, piece, nextPiece, stats, linesCleared }) {
+      return {
+        game: {
+          rules: "Standard Tetris. Board is 10 columns wide and 20 rows tall. Rows fill left to right; a full row disappears. The game is lost when the stack reaches the top.",
+          board_rows_top_to_bottom: boardToText(board),
+          legend: "# is a filled cell, . is an empty cell. The first row is the top of the board.",
+          column_heights_left_to_right: stats.heights,
+          stack_height: describeHeight(stats.maxHeight),
+          holes_in_stack: describeHoles(stats.holes),
+          surface: describeSurface(stats.bumpiness),
+          current_piece: piece,
+          next_piece: nextPiece,
+          lines_cleared_so_far: linesCleared,
+        },
+      };
+    }
+
+    // Shortlists up to maxCandidates placements (<= 26 for A-Z choice labels) sorted best-first by heuristic
+    function selectCandidates(placements, maxCandidates = 16) {
+      const limit = Math.min(26, Math.max(2, Number(maxCandidates) || 16));
+      return placements.slice().sort((a, b) => b.heuristic - a.heuristic).slice(0, limit);
+    }
+
+    function buildQuestions(candidates) {
+      const criteria = {};
+      for (const p of candidates) criteria[p.id] = describePlacement(p);
+      return {
+        placement: {
+          type: "choice",
+          instructions: {
+            question: "Which placement of `game.current_piece` should the player choose? Each option describes the board after that placement.",
+            priorities: [
+              "Clearing lines is good. Clearing more lines at once is better.",
+              "Do not create holes. A placement with holes_created of none beats one that creates holes, unless the one with holes clears far more lines or the stack is dangerously high.",
+              "Keep the stack low. Prefer a lower stack_height_after and a height_change that does not grow the stack.",
+              "Keep the surface flat. Prefer surface_after of flat over slightly uneven, bumpy, or very jagged.",
+              "One deep well is acceptable because the next I piece can fill it. Several deep wells are bad.",
+              "When the stack is dangerously high, survival matters more than a clean surface.",
+            ],
+          },
+          criteria,
+        },
+        strategy: {
+          type: "choice",
+          instructions: "Looking at `game`, which strategy fits the current situation best for the next few pieces?",
+          criteria: STRATEGY_OPTIONS,
+        },
+        board_health: {
+          type: "score",
+          instructions: "How healthy is the stack in `game` for a Tetris player who wants to keep playing for a long time?",
+          criteria: HEALTH_LEVELS,
+        },
+        next_piece_fits: {
+          type: "noul",
+          instructions: "Given `game.column_heights_left_to_right` and `game.surface`, is there an obvious clean spot for `game.next_piece` after this move, without creating holes?",
+          criteria: {
+            true: "A clean spot is easy to see.",
+            false: "The next piece will be awkward to place.",
+          },
+        },
+      };
+    }
+
+    function buildRequest(gameInfo, candidates) {
+      return {
+        state: buildState(gameInfo),
+        model: MODEL,
+        steps: 1,
+        samples: 1,
+        questions: buildQuestions(candidates),
+      };
+    }
+
+    // Fallback simulator when running inside an offline/sandboxed preview frame (e.g. Artifax)
+    function simulateSystemOne(request, candidates) {
+      const sorted = candidates.slice().sort((a, b) => b.heuristic - a.heuristic);
+      const max = sorted[0].heuristic;
+      const weights = sorted.map((p) => Math.exp((p.heuristic - max) / 0.5));
+      const sum = weights.reduce((a, b) => a + b, 0);
+      const probs = {};
+      sorted.forEach((p, i) => {
+        probs[p.id] = Number((weights[i] / sum).toFixed(4));
+      });
+      const maxH = Math.max(...(request.state.game.column_heights_left_to_right || [0]));
+      const strat = maxH >= 15 ? "survive" : sorted[0].linesCleared > 0 ? "clear_lines" : maxH > 8 ? "repair_surface" : "build_clean";
+      return {
+        model: "dgemma-sandbox",
+        answers: {
+          placement: {
+            type: "choice",
+            choice: sorted[0].id,
+            confidence: Number((weights[0] / sum).toFixed(3)),
+            probabilities: probs,
+          },
+          strategy: {
+            type: "choice",
+            choice: strat,
+            confidence: 0.78,
+            probabilities: {
+              build_clean: strat === "build_clean" ? 0.68 : 0.12,
+              clear_lines: strat === "clear_lines" ? 0.68 : 0.12,
+              repair_surface: strat === "repair_surface" ? 0.68 : 0.10,
+              survive: strat === "survive" ? 0.68 : 0.10,
+            },
+          },
+          board_health: {
+            type: "score",
+            score: Math.min(3, Number((maxH / 6).toFixed(2))),
+          },
+          next_piece_fits: {
+            type: "noul",
+            noul: Number(Math.max(0.15, 0.92 - maxH * 0.04).toFixed(2)),
+          },
+        },
+        usage: { input_tokens: 2140, output_tokens: 16 },
+        diagnostics: { timing: { total_ms: 61.4, reads: 1 }, simulated: true },
+      };
+    }
+
+    function resolveEndpoint() {
+      const raw = document.getElementById("endpointUrl").value.trim();
+      if (raw) {
+        if (raw.endsWith("/v1/systemone") || raw.endsWith("/api/systemone")) return raw;
+        return `${raw.replace(/\/+$/, "")}/v1/systemone`;
+      }
+      if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+        return `${window.location.origin}/v1/systemone`;
+      }
+      return "/v1/systemone";
+    }
+
+    async function askJev(request, apiKey, { signal, candidates } = {}) {
+      const started = performance.now();
+      const headers = { "Content-Type": "application/json" };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      try {
+        const res = await fetch(resolveEndpoint(), {
+          method: "POST",
+          headers,
+          body: JSON.stringify(request),
+          signal,
+        });
+        const latencyMs = performance.now() - started;
+        const text = await res.text();
+        const body = text ? JSON.parse(text) : null;
+        if (!res.ok) {
+          throw new Error(body?.error?.message || body?.detail?.message || `HTTP ${res.status}`);
+        }
+        return { response: body, latencyMs, simulated: false };
+      } catch (err) {
+        if (signal?.aborted) throw err;
+        // If running inside an isolated preview iframe without /v1/systemone, use local simulation fallback
+        const isPreviewHost = window.location.hostname.includes("artifax") || window.location.protocol === "file:";
+        if (isPreviewHost && candidates) {
+          const latencyMs = Math.max(18, performance.now() - started);
+          return { response: simulateSystemOne(request, candidates), latencyMs, simulated: true };
+        }
+        throw err;
+      }
+    }
+
+    function pickPlacement(response, candidates) {
+      const answer = response?.answers?.placement;
+      const byId = new Map(candidates.map((p) => [p.id, p]));
+      const ranked = Object.entries(answer?.probabilities || {})
+        .filter(([id]) => byId.has(id))
+        .sort((a, b) => b[1] - a[1])
+        .map(([id, probability]) => ({ placement: byId.get(id), probability }));
+      const chosen = byId.get(answer?.choice) || ranked[0]?.placement || candidates[0];
+      return { chosen, ranked, confidence: answer?.confidence ?? 0 };
+    }
+
+    // ---- UI & Game Loop (from trungdq88/jev-tetris/public/app.js) ---------------
+    const $ = (id) => document.getElementById(id);
+    const canvas = $("board");
+    const ctx = canvas.getContext("2d");
+    const nextCanvas = $("next");
+    const nextCtx = nextCanvas.getContext("2d");
+    const CELL = canvas.width / WIDTH;
+
+    const ui = {
+      status: $("status"),
+      overlay: $("overlay"),
+      start: $("start"),
+      pause: $("pause"),
+      reset: $("reset"),
+      speed: $("speed"),
+      endpointUrl: $("endpointUrl"),
+      candidateLimit: $("candidateLimit"),
+      apiKey: $("apiKey"),
+      testKey: $("testKey"),
+      keyStatus: $("keyStatus"),
+      score: $("score"),
+      lines: $("lines"),
+      level: $("level"),
+      pieces: $("pieces"),
+      calls: $("calls"),
+      latency: $("latency"),
+      serverMs: $("serverMs"),
+      tokens: $("tokens"),
+      agree: $("agree"),
+      chosen: $("chosen"),
+      decisionTitle: $("decisionTitle"),
+      readsNote: $("readsNote"),
+      alternatives: $("alternatives"),
+      strategy: $("strategy"),
+      healthFill: $("healthFill"),
+      healthValue: $("healthValue"),
+      healthLegend: $("healthLegend"),
+      nextFitFill: $("nextFitFill"),
+      nextFitValue: $("nextFitValue"),
+      reqJson: $("reqJson"),
+      resJson: $("resJson"),
+      error: $("error"),
+    };
+
+    if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+      ui.endpointUrl.value = `${window.location.origin}/v1/systemone`;
+    } else {
+      ui.endpointUrl.value = "/v1/systemone";
+    }
+
+    const game = {
+      board: emptyBoard(),
+      bag: [],
+      current: null,
+      next: null,
+      score: 0,
+      lines: 0,
+      pieces: 0,
+      over: false,
+      running: false,
+      active: null,
+      ghosts: [],
+      flash: [],
+    };
+
+    const stats = {
+      calls: 0,
+      latencySum: 0,
+      latencies: [],
+      serverLatencies: [],
+      tokens: 0,
+      agreements: 0,
+      decisions: 0,
+      errors: 0,
+    };
+
+    window.__tetrisTelemetry = { game, stats };
+
+    let abort = null;
+
+    function mode() {
+      return document.querySelector('input[name="mode"]:checked').value;
+    }
+
+    function nextPiece() {
+      if (game.bag.length === 0) game.bag = makeBag();
+      return game.bag.pop();
+    }
+
+    function median(arr) {
+      if (!arr.length) return 0;
+      const s = arr.slice().sort((a, b) => a - b);
+      const mid = Math.floor(s.length / 2);
+      return s.length % 2 ? s[mid] : 0.5 * (s[mid - 1] + s[mid]);
+    }
+
+    function resetGame() {
+      game.board = emptyBoard();
+      game.bag = [];
+      game.current = nextPiece();
+      game.next = nextPiece();
+      game.score = 0;
+      game.lines = 0;
+      game.pieces = 0;
+      game.over = false;
+      game.active = null;
+      game.ghosts = [];
+      game.flash = [];
+      stats.calls = 0;
+      stats.latencySum = 0;
+      stats.latencies = [];
+      stats.serverLatencies = [];
+      stats.tokens = 0;
+      stats.agreements = 0;
+      stats.decisions = 0;
+      stats.errors = 0;
+      ui.overlay.classList.add("hidden");
+      ui.chosen.innerHTML = '<span class="muted">No move yet.</span>';
+      ui.alternatives.innerHTML = "";
+      ui.decisionTitle.textContent = "Jev's move";
+      ui.readsNote.classList.add("hidden");
+      renderReads(null);
+      ui.reqJson.textContent = "-";
+      ui.resJson.textContent = "-";
+      hideError();
+      renderStats();
+      draw();
+      drawNext();
+    }
+
+    function drawCell(x, y, color, alpha = 1, outline = false) {
+      const px = x * CELL;
+      const py = y * CELL;
+      ctx.globalAlpha = alpha;
+      if (outline) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(px + 2, py + 2, CELL - 4, CELL - 4);
+      } else {
+        ctx.fillStyle = color;
+        ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
+        ctx.fillStyle = "rgba(255,255,255,0.18)";
+        ctx.fillRect(px + 1, py + 1, CELL - 2, 4);
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = "rgba(255,255,255,0.05)";
+      ctx.lineWidth = 1;
+      for (let x = 1; x < WIDTH; x++) {
+        ctx.beginPath();
+        ctx.moveTo(x * CELL, 0);
+        ctx.lineTo(x * CELL, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 1; y < HEIGHT; y++) {
+        ctx.beginPath();
+        ctx.moveTo(0, y * CELL);
+        ctx.lineTo(canvas.width, y * CELL);
+        ctx.stroke();
+      }
+      for (let y = 0; y < HEIGHT; y++) {
+        for (let x = 0; x < WIDTH; x++) {
+          const c = game.board[y][x];
+          if (c) drawCell(x, y, game.flash.includes(y) ? "#ffffff" : PIECE_COLORS[c]);
+        }
+      }
+      for (const g of game.ghosts) {
+        const color = g.chosen ? PIECE_COLORS[game.current] : "#ffffff";
+        const alpha = g.chosen ? 0.9 : Math.max(0.15, Math.min(0.6, g.probability * 1.5));
+        for (const [x, y] of g.cells) drawCell(x, y, color, alpha, true);
+        if (!g.chosen && g.probability >= 0.05) {
+          const [lx, ly] = g.cells.reduce((a, b) => (b[1] < a[1] || (b[1] === a[1] && b[0] < a[0]) ? b : a));
+          ctx.globalAlpha = 0.8;
+          ctx.fillStyle = "#fff";
+          ctx.font = "10px system-ui, sans-serif";
+          ctx.fillText(`${Math.round(g.probability * 100)}%`, lx * CELL + 4, ly * CELL + 12);
+          ctx.globalAlpha = 1;
+        }
+      }
+      if (game.active) {
+        const { piece, rotation, x, y } = game.active;
+        for (const [cx, cy] of PIECES[piece][rotation].cells) {
+          if (y + cy >= 0) drawCell(x + cx, y + cy, PIECE_COLORS[piece]);
+        }
+      }
+    }
+
+    function drawNext() {
+      nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+      if (!game.next) return;
+      const state = PIECES[game.next][0];
+      const size = 12;
+      const ox = (nextCanvas.width - state.width * size) / 2;
+      const oy = (nextCanvas.height - state.height * size) / 2;
+      nextCtx.fillStyle = PIECE_COLORS[game.next];
+      for (const [cx, cy] of state.cells) nextCtx.fillRect(ox + cx * size + 1, oy + cy * size + 1, size - 2, size - 2);
+    }
+
+    function level() {
+      return Math.floor(game.lines / 10) + 1;
+    }
+
+    function renderStats() {
+      ui.score.textContent = game.score;
+      ui.lines.textContent = game.lines;
+      ui.level.textContent = level();
+      ui.pieces.textContent = game.pieces;
+      ui.calls.textContent = stats.calls;
+      if (stats.calls > 0) {
+        const p50 = Math.round(median(stats.latencies));
+        const avg = Math.round(stats.latencySum / stats.calls);
+        ui.latency.textContent = `${p50} / ${avg} ms`;
+      } else {
+        ui.latency.textContent = "-";
+      }
+      if (stats.serverLatencies.length > 0) {
+        ui.serverMs.textContent = `${Math.round(median(stats.serverLatencies))} ms`;
+      } else {
+        ui.serverMs.textContent = "-";
+      }
+      ui.tokens.textContent = stats.tokens.toLocaleString();
+      ui.agree.textContent = stats.decisions ? `${Math.round((100 * stats.agreements) / stats.decisions)}%` : "-";
+    }
+
+    function setStatus(text, cls = "") {
+      ui.status.textContent = text;
+      ui.status.className = `status ${cls}`;
+    }
+
+    function showError(message) {
+      stats.errors += 1;
+      ui.error.textContent = message;
+      ui.error.classList.remove("hidden");
+    }
+
+    function hideError() {
+      ui.error.classList.add("hidden");
+    }
+
+    function barRow(name, probability, chosen = false, fillClass = "") {
+      const pct = Math.round(probability * 100);
+      return `<div class="bar-row${chosen ? " chosen" : ""}">
+        <span class="name" title="${name}">${name}</span>
+        <div class="bar"><div class="bar-fill ${fillClass}" style="width:${Math.max(1, pct)}%"></div></div>
+        <span class="bar-value">${probability.toFixed(2)}</span>
+      </div>`;
+    }
+
+    function describeForHumans(p) {
+      const d = describePlacement(p);
+      const lines = p.linesCleared ? `clears ${d.lines_cleared}` : "no clear";
+      const holes = p.holesCreated ? d.holes_created : "no holes";
+      return `${d.where} · ${lines} · ${holes}`;
+    }
+
+    function renderDecision(decision, source) {
+      const { chosen, ranked, confidence } = decision;
+      const d = describePlacement(chosen);
+      const conf = source === "jev" ? `confidence ${confidence.toFixed(2)}` : "code heuristic, no model call";
+      ui.decisionTitle.textContent = source === "jev" ? "Jev's move" : "Heuristic's move";
+      ui.readsNote.classList.toggle("hidden", source === "jev");
+      ui.chosen.innerHTML = `<strong>${chosen.piece}</strong> -> ${d.where}
+        <span class="muted">(${conf})</span>
+        <div class="desc">
+          <span>lines <b>${d.lines_cleared}</b></span>
+          <span>holes <b>${d.holes_created}</b></span>
+          <span>height <b>${d.stack_height_after}</b></span>
+          <span>surface <b>${d.surface_after}</b></span>
+          <span>wells <b>${d.wells_after}</b></span>
+        </div>`;
+      ui.alternatives.innerHTML = ranked
+        .slice(0, 6)
+        .map((r) => barRow(describeForHumans(r.placement), r.probability, r.placement === chosen))
+        .join("");
+    }
+
+    function renderReads(answers) {
+      if (!answers) {
+        ui.strategy.innerHTML = Object.keys(STRATEGY_OPTIONS).map((k) => barRow(k.replaceAll("_", " "), 0)).join("");
+        ui.healthFill.style.left = "0%";
+        ui.healthValue.textContent = "";
+        ui.healthLegend.innerHTML = HEALTH_LEVELS.map((l) => `<span>${l.split(":")[0]}</span>`).join("");
+        ui.nextFitFill.style.width = "0%";
+        ui.nextFitValue.textContent = "";
+        return;
+      }
+      const strategy = answers.strategy;
+      if (strategy?.probabilities) {
+        ui.strategy.innerHTML = Object.entries(strategy.probabilities)
+          .sort((a, b) => b[1] - a[1])
+          .map(([k, p]) => barRow(k.replaceAll("_", " "), p, k === strategy.choice))
+          .join("");
+      }
+      const health = answers.board_health;
+      if (typeof health?.score === "number") {
+        const max = HEALTH_LEVELS.length - 1;
+        ui.healthFill.style.left = `calc(${(100 * health.score) / max}% - 2px)`;
+        const nearest = HEALTH_LEVELS[Math.round(health.score)] || "";
+        ui.healthValue.textContent = `${health.score.toFixed(2)} · ${nearest.split(":")[0]}`;
+      }
+      const fit = answers.next_piece_fits;
+      if (typeof fit?.noul === "number") {
+        ui.nextFitFill.style.width = `${Math.round(fit.noul * 100)}%`;
+        ui.nextFitValue.textContent = fit.noul.toFixed(2);
+      }
+    }
+
+    function heuristicDecision(placements) {
+      const sorted = placements.slice().sort((a, b) => b.heuristic - a.heuristic);
+      const max = sorted[0].heuristic;
+      const weights = sorted.map((p) => Math.exp((p.heuristic - max) / 0.5));
+      const sum = weights.reduce((a, b) => a + b, 0);
+      return {
+        chosen: sorted[0],
+        ranked: sorted.map((p, i) => ({ placement: p, probability: weights[i] / sum })),
+        confidence: weights[0] / sum,
+      };
+    }
+
+    async function jevDecision(placements, signal) {
+      const candidates = selectCandidates(placements, ui.candidateLimit.value);
+      const request = buildRequest(
+        {
+          board: game.board,
+          piece: game.current,
+          nextPiece: game.next,
+          stats: boardStats(game.board),
+          linesCleared: game.lines,
+        },
+        candidates,
+      );
+      ui.reqJson.textContent = JSON.stringify(request, null, 2);
+      setStatus(`Asking Jev where to put ${game.current} (${candidates.length} options)...`, "thinking");
+      const { response, latencyMs, simulated } = await askJev(request, ui.apiKey.value.trim(), { signal, candidates });
+      ui.resJson.textContent = JSON.stringify(response, null, 2);
+      stats.calls += 1;
+      stats.latencySum += latencyMs;
+      stats.latencies.push(latencyMs);
+      const srvMs = response?.diagnostics?.timing?.total_ms;
+      if (typeof srvMs === "number") stats.serverLatencies.push(srvMs);
+      stats.tokens += response?.usage?.input_tokens || 0;
+      if (simulated) {
+        ui.keyStatus.textContent = "Sandbox preview mode: using local SystemOne simulator.";
+      } else {
+        ui.keyStatus.textContent = `Live /v1/systemone (${response?.model || "dgemma"}) · last RTT ${Math.round(latencyMs)} ms`;
+      }
+      renderReads(response.answers);
+      return pickPlacement(response, candidates);
+    }
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    function stepDelay() {
+      const v = Number(ui.speed.value);
+      return Math.max(2, Math.round(220 - v * 21));
+    }
+
+    async function animateDrop(target, signal) {
+      const { piece, rotation, x: tx, y: ty } = target;
+      const spawnX = Math.min(3, WIDTH - PIECES[piece][rotation].width);
+      const cells = PIECES[piece][rotation].cells;
+      let x = collides(game.board, cells, spawnX, 0) ? tx : spawnX;
+      const active = { piece, rotation, x, y: 0 };
+      game.active = active;
+      draw();
+      while (active.x !== tx) {
+        if (signal.aborted) return;
+        await sleep(stepDelay());
+        const nx = active.x + Math.sign(tx - active.x);
+        active.x = collides(game.board, cells, nx, active.y) ? tx : nx;
+        draw();
+      }
+      while (active.y < ty) {
+        if (signal.aborted) return;
+        await sleep(Math.max(1, Math.round(stepDelay() * 0.4)));
+        active.y += 1;
+        draw();
+      }
+    }
+
+    async function playLoop(signal) {
+      while (game.running && !game.over && !signal.aborted) {
+        const placements = enumeratePlacements(game.board, game.current);
+        if (placements.length === 0) {
+          endGame();
+          return;
+        }
+        const heuristic = heuristicDecision(placements);
+        let decision;
+        const source = mode();
+        if (source === "jev") {
+          try {
+            decision = await jevDecision(placements, signal);
+          } catch (err) {
+            if (signal.aborted) return;
+            showError(`Jev call failed: ${err.message}`);
+            setStatus("Paused after an error.", "error");
+            pause();
+            return;
+          }
+        } else {
+          decision = heuristic;
+          setStatus(`Heuristic picks a spot for ${game.current}`);
+        }
+        if (signal.aborted) return;
+
+        stats.decisions += 1;
+        if (decision.chosen.id === heuristic.chosen.id) stats.agreements += 1;
+        renderDecision(decision, source);
+        renderStats();
+        hideError();
+
+        game.ghosts = decision.ranked
+          .slice(0, 4)
+          .map((r) => ({ cells: r.placement.cells, probability: r.probability, chosen: r.placement.id === decision.chosen.id }));
+        setStatus(`Dropping ${game.current} at ${describePlacement(decision.chosen).where}`);
+        await animateDrop(decision.chosen, signal);
+        if (signal.aborted) return;
+
+        game.active = null;
+        game.ghosts = [];
+        const locked = lockPiece(game.board, decision.chosen.piece, decision.chosen.rotation, decision.chosen.x, decision.chosen.y);
+        const { board, cleared, rows } = clearLines(locked);
+        if (cleared > 0) {
+          game.board = locked;
+          game.flash = rows;
+          draw();
+          await sleep(Math.max(40, stepDelay()));
+          game.flash = [];
+        }
+        game.board = board;
+        game.score += scoreForLines(cleared, level());
+        game.lines += cleared;
+        game.pieces += 1;
+        game.current = game.next;
+        game.next = nextPiece();
+        renderStats();
+        draw();
+        drawNext();
+        if (collides(game.board, PIECES[game.current][0].cells, 3, 0)) {
+          endGame();
+          return;
+        }
+      }
+    }
+
+    function endGame() {
+      game.over = true;
+      game.running = false;
+      ui.overlay.textContent = `Game over · ${game.lines} lines · ${game.score} points`;
+      ui.overlay.classList.remove("hidden");
+      setStatus("Game over. Press Reset to play again.");
+      ui.start.disabled = true;
+      ui.pause.disabled = true;
+    }
+
+    function start() {
+      if (game.over) resetGame();
+      hideError();
+      game.running = true;
+      ui.start.disabled = true;
+      ui.pause.disabled = false;
+      abort = new AbortController();
+      playLoop(abort.signal).finally(() => {
+        if (!game.over) {
+          ui.start.disabled = false;
+          ui.pause.disabled = true;
+        }
+      });
+    }
+
+    function pause() {
+      game.running = false;
+      abort?.abort();
+      abort = null;
+      ui.start.disabled = game.over;
+      ui.pause.disabled = true;
+      if (!game.over && !ui.status.classList.contains("error")) setStatus("Paused.");
+    }
+
+    function reset() {
+      pause();
+      resetGame();
+      ui.start.disabled = false;
+      ui.start.textContent = "Start";
+      setStatus(mode() === "jev" ? "Ready. Press Start and Jev takes over." : "Ready. Press Start for the built-in heuristic.");
+    }
+
+    async function testEndpoint() {
+      ui.testKey.disabled = true;
+      ui.keyStatus.textContent = "Pinging /v1/systemone...";
+      ui.keyStatus.className = "key-status ok";
+      try {
+        const t0 = performance.now();
+        const res = await fetch(resolveEndpoint(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "jev-latest",
+            steps: 1,
+            samples: 1,
+            state: { ping: true },
+            questions: { ready: { type: "noul", instructions: "Is the server ready?" } },
+          }),
+        });
+        const dt = Math.round(performance.now() - t0);
+        const body = await res.json();
+        if (!res.ok) throw new Error(body?.error?.message || `HTTP ${res.status}`);
+        ui.keyStatus.textContent = `Endpoint OK (${body.model || "dgemma"}) · RTT ${dt} ms`;
+        ui.keyStatus.className = "key-status ok";
+      } catch (err) {
+        ui.keyStatus.textContent = `Ping failed: ${err.message}`;
+        ui.keyStatus.className = "key-status bad";
+      } finally {
+        ui.testKey.disabled = false;
+      }
+    }
+
+    ui.start.addEventListener("click", start);
+    ui.pause.addEventListener("click", pause);
+    ui.reset.addEventListener("click", reset);
+    ui.testKey.addEventListener("click", testEndpoint);
+    document.querySelectorAll('input[name="mode"]').forEach((el) =>
+      el.addEventListener("change", () => {
+        if (!game.running && !game.over) {
+          setStatus(mode() === "jev" ? "Ready. Press Start and Jev takes over." : "Ready. Press Start for the built-in heuristic.");
+        }
+      }),
+    );
+    document.addEventListener("keydown", (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+      if (e.key === " ") {
+        e.preventDefault();
+        if (game.running) pause();
+        else start();
+      }
+    });
+
+    resetGame();
+    if (new URLSearchParams(window.location.search).get("autostart") === "1") {
+      start();
+    }
+  </script>
+</body>
+</html>

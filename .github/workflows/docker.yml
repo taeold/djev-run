@@ -8,6 +8,7 @@ on:
       - '.github/workflows/docker.yml'
       - 'snake.html'
       - 'dino.html'
+      - 'tetris.html'
       - 'ultra_fast_entrypoint.sh'
 
 permissions:
@@ -26,7 +27,7 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
 
-      - name: Clone mmastrac/djev-spark, mmastrac/djev (span-answer-type), and vLLM PR #58216 overlay
+      - name: Clone mmastrac/djev-spark, mmastrac/djev (span-answer-type), and vLLM PR #58216 + #58226 overlay
         run: |
           git clone --depth=1 https://github.com/mmastrac/djev-spark.git djev-spark
           git clone https://github.com/mmastrac/djev.git mmastrac-djev
@@ -34,6 +35,7 @@ jobs:
           cp mmastrac-djev/structured_server.py djev-spark/server/structured_server.py
           cp snake.html djev-spark/server/snake.html
           cp dino.html djev-spark/server/dino.html
+          if [ -f tetris.html ]; then cp tetris.html djev-spark/server/tetris.html; fi
           cp ultra_fast_entrypoint.sh djev-spark/entrypoint.sh
           cat > patch_server.py << 'EOF'
           import pathlib
@@ -49,6 +51,8 @@ jobs:
               "    \"/snake.html\": \"snake.html\",\n"
               "    \"/dino\": \"dino.html\",\n"
               "    \"/dino.html\": \"dino.html\",\n"
+              "    \"/tetris\": \"tetris.html\",\n"
+              "    \"/tetris.html\": \"tetris.html\",\n"
               "    \"/playground\": \"playground.html\",\n"
               "    \"/playground.html\": \"playground.html\",\n"
               "    \"/walk\": \"walk.html\",\n"
@@ -116,10 +120,20 @@ jobs:
 
           VLLM_6591 = "6591b093b29536dd070c6af3628b734025c53e23"
           VLLM_F831 = "f831226339b87554b1de9341276e7bee7270fa8a"
+          VLLM_58226 = "0436817607d5f7cae0f88f2f4e8347f9fc0b09d4"
           dg_6591 = urllib.request.urlopen(f"https://raw.githubusercontent.com/mmastrac/vllm/{VLLM_6591}/vllm/model_executor/models/diffusion_gemma.py").read().decode("utf-8")
           dg_f831 = urllib.request.urlopen(f"https://raw.githubusercontent.com/mmastrac/vllm/{VLLM_F831}/vllm/model_executor/models/diffusion_gemma.py").read().decode("utf-8")
           split_anchor = "@torch.compile(dynamic=True, backend=current_platform.simple_compile_backend)\ndef _compute_num_rejected("
           dg_head = dg_6591.split(split_anchor, 1)[0].replace("import torch\n", "import torch\nimport torch._dynamo\n", 1)
+          dg_head = dg_head.replace(
+              "from vllm.v1.outputs import LogprobsTensors",
+              "from vllm.v1.outputs import LogprobsTensors\n"
+              "from vllm.v1.sample.ops.diffusion_sampler import (\n"
+              "    sample_row_stats,\n"
+              "    sample_row_stats_reference,\n"
+              ")",
+              1,
+          )
           old_cl = """    def compute_logits(self, hidden_states: torch.Tensor) -> torch.Tensor | None:
                   logits = self.logits_processor(self.lm_head, hidden_states)
                   if logits is not None and self.final_logit_softcapping is not None:
@@ -141,6 +155,144 @@ jobs:
                   return logits"""
           dg_head = dg_head.replace(old_cl, new_cl, 1)
           dg_tail = split_anchor + dg_f831.split(split_anchor, 1)[1]
+          dg_tail = dg_tail.replace(
+              "@torch._dynamo.config.patch(recompile_limit=64)\n@torch.compile(dynamic=True, backend=current_platform.simple_compile_backend)\ndef _compiled_sample_step(\n    # Logits from the model [num_decode * CL, vocab]\n    logits: torch.Tensor,",
+              "@torch._dynamo.config.patch(recompile_limit=64)\n@torch.compile(dynamic=True, backend=current_platform.simple_compile_backend)\ndef _denoise_temperature(\n    step_tensor: torch.Tensor,\n    slots: torch.Tensor,\n    max_denoising_steps: float,\n    t_min: float,\n    t_max: float,\n) -> torch.Tensor:\n    steps_f = step_tensor[slots].float()\n    remaining = (max_denoising_steps - steps_f).clamp(min=1.0)\n    return t_min + (t_max - t_min) * (remaining / max_denoising_steps)\n\n\ndef _compiled_sample_step(\n    new_tokens: torch.Tensor,\n    argmax_tokens: torch.Tensor,\n    token_entropy: torch.Tensor,\n    probs: torch.Tensor | None,",
+              1,
+          )
+          dg_tail = dg_tail.replace(
+              "    # Scalar config\n    max_denoising_steps: float,\n    t_min: float,\n    t_max: float,\n    confidence_threshold: float,",
+              "    # Scalar config\n    confidence_threshold: float,",
+              1,
+          )
+          old_p123 = """    num_decode = decode_slots.shape[0]
+              device = decode_slots.device
+
+              # ---- Phase 1: Temperature schedule ----
+              steps_f = step_tensor[decode_slots].float()
+              remaining = (max_denoising_steps - steps_f).clamp(min=1.0)
+              temp = t_min + (t_max - t_min) * (remaining / max_denoising_steps)
+
+              # ---- Phase 2: Temperature scaling + Gumbel-max sampling ----
+              logits_3d = logits.reshape(num_decode, CL, -1).float()
+              scaled = logits_3d / temp[:, None, None].clamp(min=1e-10)
+
+              # Gumbel-max trick: argmax(logits/T + Gumbel) ~ sample from softmax(logits/T)
+              u = torch.rand_like(scaled).clamp(min=1e-20)
+              gumbel = -torch.log(-torch.log(u))
+              # Zero noise when temp==0 (greedy)
+              noisy = scaled + gumbel * (temp[:, None, None] > 0).float()
+              new_tokens = noisy.view(-1, noisy.shape[-1]).argmax(dim=-1).view(num_decode, CL)
+              argmax_tokens = (
+                  scaled.view(-1, scaled.shape[-1]).argmax(dim=-1).view(num_decode, CL)
+              )
+              if allowed is not None:
+                  new_tokens = allowed[new_tokens]
+                  argmax_tokens = allowed[argmax_tokens]
+
+              # ---- Phase 3: Probs, self-conditioning, confidence ----
+              log_probs = scaled.log_softmax(dim=-1)
+              probs = log_probs.exp()
+
+              token_entropy = -(probs * log_probs).sum(dim=-1)  # [num_decode, CL]"""
+          new_p123 = """    num_decode = decode_slots.shape[0]
+              device = decode_slots.device
+
+              if allowed is not None:
+                  new_tokens = allowed[new_tokens]
+                  argmax_tokens = allowed[argmax_tokens]
+
+              # ---- Phase 3: Confidence ----"""
+          dg_tail = dg_tail.replace(old_p123, new_p123, 1)
+          dg_tail = dg_tail.replace(
+              "    # ---- Phase 7: Copy canvas → draft_tokens for all slots ----\n    draft_tokens[all_slots, :CL] = canvas[all_slots]\n\n    return scaled",
+              "    # ---- Phase 7: Copy canvas → draft_tokens for all slots ----\n    draft_tokens[all_slots, :CL] = canvas[all_slots]",
+              1,
+          )
+          dg_tail = dg_tail.replace(
+              "budget = max(1, int(free * 0.5) // max(W * self.vocab_size * 4 * 10, 1))",
+              "budget = max(1, int(free * 0.5) // max(W * self.vocab_size * 4 * 3, 1))",
+              1,
+          )
+          old_inv = """                scaled = _compiled_sample_step(
+                              tile_logits,
+                              tile_slots,
+                              decode_idx[sel],
+                              all_slots,
+                              tile_valid,
+                              # State, viewed at this tile's width
+                              states.canvas[:, :W],
+                              states.argmax_canvas[:, :W],
+                              states.step,
+                              states.is_encoder_phase,
+                              states.confident,
+                              states.self_conditioning_embeds[:, :W],
+                              embed_weight,
+                              self.normalizer,
+                              states.accepted_canvas_history[:, :, :W],
+                              states.accepted_canvas_history_len,
+                              states.max_steps,
+                              states.pin_mask[:, :W],
+                              states.seed_canvas[:, :W],
+                              states.read_only,
+                              # Output
+                              sampled[:, :W],
+                              num_sampled,
+                              self.req_states.draft_tokens,
+                              # Config
+                              max_denoising_steps=float(states.max_denoising_steps),
+                              t_min=self.t_min,
+                              t_max=self.t_max,
+                              confidence_threshold=self.confidence_threshold,"""
+          new_inv = """                temp = _denoise_temperature(
+                              states.step,
+                              tile_slots,
+                              float(states.max_denoising_steps),
+                              self.t_min,
+                              self.t_max,
+                          )
+                          probs_dtype = embed_weight.dtype if compute_sc else None
+                          if tile_logits.is_cuda:
+                              seed = int(torch.randint(0, 2**31 - 1, (1,)).item())
+                              stats = sample_row_stats(tile_logits, temp, W, seed, probs_dtype)
+                          else:
+                              stats = sample_row_stats_reference(tile_logits, temp, W, probs_dtype)
+                          argmax_rows, sample_rows, entropy_rows, probs_rows = stats
+                          probs = probs_rows.view(n, W, -1) if probs_rows is not None else None
+                          scaled = None
+                          if want_logprobs:
+                              scaled = tile_logits.float().view(n, W, -1) / temp[:, None, None].clamp(min=1e-10)
+                          _compiled_sample_step(
+                              sample_rows.view(n, W),
+                              argmax_rows.view(n, W),
+                              entropy_rows.view(n, W),
+                              probs,
+                              tile_slots,
+                              decode_idx[sel],
+                              all_slots,
+                              tile_valid,
+                              # State, viewed at this tile's width
+                              states.canvas[:, :W],
+                              states.argmax_canvas[:, :W],
+                              states.step,
+                              states.is_encoder_phase,
+                              states.confident,
+                              states.self_conditioning_embeds[:, :W],
+                              embed_weight,
+                              self.normalizer,
+                              states.accepted_canvas_history[:, :, :W],
+                              states.accepted_canvas_history_len,
+                              states.max_steps,
+                              states.pin_mask[:, :W],
+                              states.seed_canvas[:, :W],
+                              states.read_only,
+                              # Output
+                              sampled[:, :W],
+                              num_sampled,
+                              self.req_states.draft_tokens,
+                              # Config
+                              confidence_threshold=self.confidence_threshold,"""
+          dg_tail = dg_tail.replace(old_inv, new_inv, 1)
           old_remove = """    def remove_request(self, req_id: str) -> None:
                   idx = self._req_id_to_index.pop(req_id, None)
                   if idx is not None:
@@ -155,9 +307,11 @@ jobs:
           vllm_root = pathlib.Path("/usr/local/lib/python3.12/dist-packages/vllm")
           baked_vllm = pathlib.Path("/opt/dgemma/v9_baked/vllm")
           (vllm_root / "model_executor/models/diffusion_gemma.py").write_text(dg_head + dg_tail)
+          (vllm_root / "v1/sample/ops").mkdir(parents=True, exist_ok=True)
+          urllib.request.urlretrieve(f"https://raw.githubusercontent.com/mmastrac/vllm/{VLLM_58226}/vllm/v1/sample/ops/diffusion_sampler.py", vllm_root / "v1/sample/ops/diffusion_sampler.py")
           for rel in ("utils/diffusion.py", "v1/core/sched/diffusion_scheduler.py"):
               urllib.request.urlretrieve(f"https://raw.githubusercontent.com/mmastrac/vllm/{VLLM_F831}/vllm/{rel}", vllm_root / rel)
-          for rel in ("model_executor/models/diffusion_gemma.py", "utils/diffusion.py", "v1/core/sched/diffusion_scheduler.py"):
+          for rel in ("model_executor/models/diffusion_gemma.py", "v1/sample/ops/diffusion_sampler.py", "utils/diffusion.py", "v1/core/sched/diffusion_scheduler.py"):
               dest = baked_vllm / rel
               dest.parent.mkdir(parents=True, exist_ok=True)
               shutil.copy2(vllm_root / rel, dest)
@@ -196,10 +350,10 @@ jobs:
           FROM ghcr.io/taeold/djev-run:latest
           COPY patch_vllm.py /tmp/patch_vllm.py
           RUN python3 /tmp/patch_vllm.py && rm /tmp/patch_vllm.py
-          COPY server/structured_server.py server/snake.html server/dino.html server/playground.html server/walk.html server/cube.html server/test_structured_server.py /opt/dgemma/
-          COPY server/structured_server.py server/snake.html server/dino.html /opt/dgemma/v9_baked/dgemma/
+          COPY server/ /opt/dgemma/
+          COPY server/ /opt/dgemma/v9_baked/dgemma/
           COPY entrypoint.sh /entrypoint.sh
-          RUN chmod +x /entrypoint.sh && python3 -m compileall -f -q /opt/dgemma/structured_server.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/diffusion_gemma.py /usr/local/lib/python3.12/dist-packages/vllm/utils/diffusion.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/diffusion_scheduler.py
+          RUN chmod +x /entrypoint.sh && python3 -m compileall -f -q /opt/dgemma/structured_server.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/diffusion_gemma.py /usr/local/lib/python3.12/dist-packages/vllm/v1/sample/ops/diffusion_sampler.py /usr/local/lib/python3.12/dist-packages/vllm/utils/diffusion.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/diffusion_scheduler.py
           EXPOSE 8080
           ENTRYPOINT ["/entrypoint.sh"]
           EOF

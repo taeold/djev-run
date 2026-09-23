@@ -819,8 +819,10 @@ async function loop() {
     await stepOnce();
     if (!running || !alive) break;
     const elapsed = performance.now() - tStart;
-    const wait = Math.max(16, 65 - elapsed);
-    await new Promise(r => setTimeout(r, wait));
+    const wait = Math.max(0, 50 - elapsed);
+    if (wait > 0) {
+      await new Promise(r => setTimeout(r, wait));
+    }
   }
 }
 

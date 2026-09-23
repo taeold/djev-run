@@ -346,8 +346,9 @@
     <label class="ctrl-label">
       In-Flight:
       <select id="inflightSelect">
-        <option value="1" selected>1 request</option>
+        <option value="1">1 request</option>
         <option value="2">2 requests in flight</option>
+        <option value="3" selected>3 requests in flight</option>
         <option value="4">4 requests in flight</option>
       </select>
     </label>
@@ -361,7 +362,7 @@
     <div class="player-header">
       <span class="player-chip"></span>
       <span class="player-name">Jev (djev-dgemma)</span>
-      <span class="player-detail" id="playerDetailText">Cloud Run RTX PRO 6000 · unassisted · 1 request in flight</span>
+      <span class="player-detail" id="playerDetailText">Cloud Run RTX PRO 6000 · unassisted · 3 in flight</span>
     </div>
     <div class="pipeline-line" id="pipelineText">THINKING 0 &nbsp;&rarr;&nbsp; ANSWER RUN &nbsp;&rarr;&nbsp; ACTION RUN &nbsp;&middot;&nbsp; skipped 0</div>
   </div>
@@ -1256,8 +1257,10 @@ Action analysis:
       const reqEpoch = game.epoch;
       const reqFrame = game.survivalFrames;
       game.lastReqFrame = reqFrame;
+      const stepFrames = Math.max(2, Math.ceil(latencyFrames / maxInflight));
       const first = [latencyFrames, latencyFrames + jitterFrames];
-      const plan = planAction(game, first, first);
+      const follow = [latencyFrames + stepFrames, latencyFrames + stepFrames + jitterFrames];
+      const plan = planAction(game, first, follow);
       const payload = buildQuestion(plan);
 
       inflightCount++;
@@ -1282,7 +1285,7 @@ Action analysis:
         if (!running || !game || game.crashed) return;
 
         // Observe timing in frames (exact Pilot.observe_timing from pilot.py)
-        const actualFrames = Math.min(8, Math.max(3, game.survivalFrames - reqFrame));
+        const actualFrames = Math.min(12, Math.max(3, game.survivalFrames - reqFrame));
         observedFrames.push(actualFrames);
         if (observedFrames.length > 16) observedFrames.shift();
         const recent = [...observedFrames].sort((a, b) => a - b);
@@ -1440,11 +1443,6 @@ Action analysis:
             }
           }
         } else {
-          if (inflightCount > 0 && game.survivalFrames - (game.lastReqFrame || 0) >= 4) {
-            renderCanvas();
-            drawCharts();
-            return;
-          }
           const shieldMode = document.getElementById("shieldSelect").value;
           if (shieldMode === "assisted") {
             const nowPlan = planAction(game, [0, 1], [latencyFrames, latencyFrames + jitterFrames]);
@@ -1544,10 +1542,10 @@ Action analysis:
           document.getElementById("tileSurvival").textContent = `${(game.survivalFrames / 60).toFixed(1)}s`;
 
           const now = performance.now();
-          const maxInflight = parseInt(document.getElementById("inflightSelect").value, 10) || 1;
+          const maxInflight = parseInt(document.getElementById("inflightSelect").value, 10) || 3;
           if (maxInflight === 1 && inflightCount === 0) {
             querySystemOne();
-          } else if (maxInflight > 1 && now - lastRequestAt >= 32) {
+          } else if (maxInflight > 1 && now - lastRequestAt >= 36) {
             lastRequestAt = now;
             querySystemOne();
           }
