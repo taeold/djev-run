@@ -2,10 +2,17 @@
 
 Serve DiffusionGemma-Jev (`djev`) on a TypeSafe AI compatible API on Cloud Run
 with an NVIDIA RTX PRO 6000 Blackwell GPU. Built on
+[`mmastrac/djev`](https://github.com/mmastrac/djev) and
 [`mmastrac/djev-spark`](https://github.com/mmastrac/djev-spark)
-([`@mmastrac`](https://x.com/mmastrac/status/2100373761195401724)) with the
-Snake demo inspired by
-[`mizorewww/laya-coreml`](https://github.com/mizorewww/laya-coreml).
+([`@mmastrac`](https://x.com/mmastrac/status/2100373761195401724),
+[`vllm#57250`](https://github.com/vllm-project/vllm/pull/57250),
+[`vllm#58216`](https://github.com/vllm-project/vllm/pull/58216),
+[`vllm#58226`](https://github.com/vllm-project/vllm/pull/58226)), with built-in
+browser demos inspired by
+[`mizorewww/laya-coreml`](https://github.com/mizorewww/laya-coreml) (`/snake`),
+[`virajbhartiya/laya-vs-jev`](https://github.com/virajbhartiya/laya-vs-jev)
+(`/dino`), and [`trungdq88/jev-tetris`](https://github.com/trungdq88/jev-tetris)
+(`/tetris`).
 
 <img width="640" height="360" alt="djev snake" src="https://github.com/user-attachments/assets/2e9a5321-f8a9-4734-b6f2-4d6f47193390" />
 
@@ -56,7 +63,7 @@ gcloud beta run deploy djev-dgemma \
 # --no-cpu-throttling: keeps all 20 vCPUs active during weight loading and vLLM scheduling
 # --network=default --subnet=default --vpc-egress=all-traffic: streams weights from GCS over Google internal networking (~1.05 GiB/s)
 # mount-options=enable-buffered-read=true: prefetches 18 GB safetensors shards sequentially from GCS
-# TEST_PAGE=1: enables the built-in /snake and /playground web UIs
+# TEST_PAGE=1: enables the built-in /snake, /dino, /tetris, and /playground web UIs
 # COPY_TO_SHM=1: stages the 17.5 GB model into /dev/shm RAM in the background while Python imports torch/vllm
 # VLLM_WORKER_MULTIPROC_METHOD=fork: forks EngineCore from APIServer without re-importing Python
 # ENFORCE_EAGER=1 & TORCH_COMPILE_DISABLE=1: skips torch.compile, CUDA graph capture, and redundant startup profiling
@@ -69,15 +76,20 @@ gcloud beta run deploy djev-dgemma \
 standalone HTML files with zero external dependencies. They call
 `POST /v1/systemone` directly from the browser via `fetch()`:
 
--   **Snake Arena**: Open `https://<your-cloud-run-url>/snake` in your browser.
--   **Chrome T-Rex Dino Arena**: Open `https://<your-cloud-run-url>/dino` in
-    your browser (`unassisted` raw `/v1/systemone` mode with 3-way pipelined
-    in-flight requests and `model + live shield` mode, 2x HiDPI Chromium
-    sprites, exact two-stage pixel-box collision checks, and unthrottled 60 FPS
-    Web Worker physics loop).
--   **Tetris Arena**: Open `https://<your-cloud-run-url>/tetris` in your browser
-    (full 10x20 SRS Tetris board with candidate placement ranking via
-    `/v1/systemone`).
+-   **Snake Arena (`/snake`)**: Open `https://<your-cloud-run-url>/snake` in
+    your browser (12x12 grid with flood-fill safety analysis and live move
+    probability bars).
+-   **Chrome T-Rex Dino Arena (`/dino`)**: Open
+    `https://<your-cloud-run-url>/dino` in your browser (`unassisted` raw
+    `/v1/systemone` mode with 3-way pipelined in-flight requests and
+    `model + live shield` mode, 2x HiDPI Chromium sprites, exact two-stage
+    pixel-box collision checks, and unthrottled 60 FPS Web Worker physics loop).
+-   **Tetris Arena (`/tetris`)**: Open `https://<your-cloud-run-url>/tetris` in
+    your browser (10x20 Tetris board adapted from
+    [`trungdq88/jev-tetris`](https://github.com/trungdq88/jev-tetris) with
+    single-pass 4-question speculative fan-out over `placement`, `strategy`,
+    `board_health`, and `next_piece_fits`, plus next-piece `/v1/systemone`
+    prefetching for 0 ms inter-piece wait at 60 FPS).
 -   **Extractive Spans (`span` / `spans`), Constrained Readout & Fused Sampler**:
     Built on [`mmastrac/djev`](https://github.com/mmastrac/djev)
     (`span-answer-type`),
@@ -146,9 +158,10 @@ CLOUD_RUN_URL="https://<your-cloud-run-url>" TYPESAFE_AI_API_KEY="$(gcloud auth 
 
 ## Performance & JevBench v1.3.0 (`N = 231`)
 
--   **Cold start from zero instances**: **29.7s** (`VLLM_ENABLE_V1_MULTIPROCESSING=0`
-    in-process vLLM engine + 32-worker parallel rootfs prefetch + 2-shard
-    background `/dev/shm` streaming, down from `4m 05s` baseline)
+-   **Cold start from zero instances**: **47.5s** (`29.7s` engine init with
+    `VLLM_ENABLE_V1_MULTIPROCESSING=0` in-process vLLM engine + 32-worker
+    parallel rootfs prefetch + 2-shard background `/dev/shm` streaming, down
+    from `4m 05s` baseline)
 -   **Single-request latency**: **~61 ms server / ~116 ms WAN RTT** (`steps=1, samples=1`;
     **~121 ms p50 WAN RTT** with `samples="auto"`)
 -   **JevBench v1.3.0 (`N = 231` public suite, `diffusion_constrained=True`)**:
