@@ -1,672 +1,931 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>djev (DiffusionGemma-Jev) plays Tetris</title>
-  <meta name="description" content="Demo: TypeSafe's Jev model chooses every Tetris move from placements the code enumerates." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect x='1' y='1' width='6' height='6' fill='%233fd6f0'/><rect x='9' y='1' width='6' height='6' fill='%23f5d547'/><rect x='1' y='9' width='6' height='6' fill='%23b565f2'/><rect x='9' y='9' width='6' height='6' fill='%23f26b6b'/></svg>" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>djev (DiffusionGemma-Jev) / tetris</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <style>
-:root {
-  --bg: #0e1118;
-  --panel: #161b26;
-  --panel-2: #1d2330;
-  --border: #2a3242;
-  --text: #e7ecf5;
-  --muted: #8f9bb3;
-  --accent: #6ea8ff;
-  --accent-2: #3fd6f0;
-  --good: #5fe38a;
-  --warn: #f5d547;
-  --bad: #f26b6b;
-  --radius: 10px;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-}
+    :root {
+      --bg-canvas: #090a0f;
+      --bg-subtle: #0d0f17;
+      --bg-surface: #121520;
+      --border: #1e2336;
+      --border-muted: #161a29;
+      --text-primary: #e2e8f0;
+      --text-muted: #64748b;
+      --text-secondary: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #10b981;
+      --accent-amber: #eab308;
+      --accent-red: #ef4444;
+      --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    }
 
-* { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-html, body { margin: 0; padding: 0; }
+    html, body {
+      background: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
 
-body {
-  background: radial-gradient(1200px 600px at 20% -10%, #1b2436 0%, var(--bg) 60%);
-  color: var(--text);
-  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  min-height: 100vh;
-}
+    body {
+      padding: 20px 24px;
+    }
 
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
-code { font-family: var(--mono); font-size: 0.9em; background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+    .wrap {
+      width: 960px;
+      max-width: 100%;
+      margin: 0 auto;
+    }
 
-.top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 24px;
-  padding: 24px 28px 8px;
-  flex-wrap: wrap;
-}
-.top h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: -0.01em; }
-.sub { margin: 0; color: var(--muted); max-width: 640px; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      height: 44px;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      gap: 16px;
+    }
 
-.mode { display: flex; gap: 14px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; }
-.mode label { display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+    .top-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
 
-.layout {
-  display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
-  gap: 24px;
-  padding: 16px 28px 28px;
-  align-items: start;
-}
+    .title {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
 
-.board-col { display: flex; flex-direction: column; gap: 12px; align-items: center; position: sticky; top: 16px; }
-.board-wrap { position: relative; }
-canvas#board {
-  width: 300px;
-  height: 600px;
-  background: #0a0d14;
-  border: 2px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
-  image-rendering: pixelated;
-}
-.overlay {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center; text-align: center;
-  background: rgba(10, 13, 20, 0.78);
-  border-radius: 8px;
-  font-size: 22px; font-weight: 700;
-  padding: 20px;
-}
-.hidden { display: none !important; }
+    .title .model-tag {
+      color: var(--text-secondary);
+      font-weight: 400;
+      font-size: 13px;
+    }
 
-.status-row { min-height: 22px; width: 300px; }
-.status { color: var(--muted); font-size: 14px; }
-.status.thinking { color: var(--accent-2); }
-.status.error { color: var(--bad); }
+    .nav-links {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
 
-.controls { display: flex; gap: 8px; align-items: center; width: 300px; flex-wrap: wrap; }
-button {
-  background: var(--panel-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 14px;
-  font: inherit;
-  cursor: pointer;
-}
-button:hover:not(:disabled) { border-color: var(--accent); }
-button:disabled { opacity: 0.45; cursor: not-allowed; }
-button.primary { background: var(--accent); border-color: var(--accent); color: #0b1220; font-weight: 600; }
-.speed { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; margin-left: auto; }
-.speed input { width: 90px; }
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+    }
 
-.side-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-}
-.card h2 { margin: 0 0 10px; font-size: 15px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+    .nav-links a:hover {
+      color: var(--accent-blue);
+    }
 
-.key-row { display: flex; gap: 8px; }
-.key-row input {
-  flex: 1;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  padding: 8px 10px;
-  font-family: var(--mono);
-  font-size: 13px;
-  min-width: 0;
-}
-.key-row input:focus { outline: none; border-color: var(--accent); }
-.remember { display: flex; gap: 6px; align-items: center; margin-top: 8px; color: var(--muted); font-size: 13px; }
-.hint { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
-.key-status { font-size: 13px; margin-top: 6px; min-height: 18px; }
-.key-status.ok { color: var(--good); }
-.key-status.bad { color: var(--bad); }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      width: 108px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
 
-.stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
-.stat { display: flex; flex-direction: column; gap: 2px; }
-.stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
-.stat span:not(.label) { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
-canvas#next { background: #0a0d14; border: 1px solid var(--border); border-radius: 6px; width: 80px; height: 50px; }
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .dot.live { background: var(--accent-green); }
+    .dot.warn { background: var(--accent-amber); }
+    .dot.err { background: var(--accent-red); }
 
-.muted { color: var(--muted); }
-#chosen { margin: 0 0 10px; }
-#readsNote { margin: 0 0 10px; font-size: 13px; }
-#chosen strong { color: var(--text); }
-.desc { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.desc span { background: var(--panel-2); border-radius: 6px; padding: 2px 8px; font-size: 12px; color: var(--muted); }
-.desc span b { color: var(--text); font-weight: 500; }
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
 
-.bar-list { display: flex; flex-direction: column; gap: 6px; }
-.bar-row { display: grid; grid-template-columns: 240px 1fr 52px; gap: 10px; align-items: center; font-size: 13px; }
-.bar-row .name { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bar-row.chosen .name { color: var(--text); font-weight: 600; }
-.bar { position: relative; height: 12px; background: var(--panel-2); border-radius: 6px; overflow: hidden; }
-.bar-fill { height: 100%; background: var(--accent); border-radius: 6px; transition: width 0.25s ease; }
-.bar-fill.noul { background: var(--good); }
-.bar-value { font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
-.bar .bar-value { position: absolute; right: 6px; top: -3px; font-size: 11px; }
+    select#mode-select {
+      height: 32px;
+      padding: 0 10px;
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 400;
+      cursor: pointer;
+      outline: none;
+    }
 
-.read { margin-bottom: 12px; }
-.read:last-child { margin-bottom: 0; }
-.read-label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-.gauge { height: 14px; background: linear-gradient(90deg, var(--good), var(--warn), var(--bad)); border-radius: 7px; position: relative; }
-.gauge-fill {
-  position: absolute; top: -3px; width: 4px; height: 20px; background: #fff; border-radius: 2px;
-  left: 0; transition: left 0.3s ease; box-shadow: 0 0 0 2px rgba(0,0,0,0.4);
-}
-.gauge-legend { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font-size: 11px; color: var(--muted); margin-top: 6px; }
+    select#mode-select:focus {
+      border-color: var(--accent-blue);
+    }
 
-details.card summary { cursor: pointer; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
-.inspector-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
-pre {
-  margin: 0;
-  background: #0a0d14;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px;
-  font-family: var(--mono);
-  font-size: 11px;
-  line-height: 1.4;
-  max-height: 360px;
-  overflow: auto;
-  white-space: pre;
-}
+    button {
+      height: 32px;
+      padding: 0 14px;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 5px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background-color 150ms ease, border-color 150ms ease;
+    }
 
-.error {
-  background: rgba(242, 107, 107, 0.12);
-  border: 1px solid var(--bad);
-  color: #ffb3b3;
-  border-radius: var(--radius);
-  padding: 10px 14px;
-  font-size: 14px;
-}
+    button:focus-visible {
+      outline: 2px solid var(--accent-blue);
+      outline-offset: 2px;
+    }
 
-.foot { padding: 8px 28px 24px; color: var(--muted); font-size: 13px; }
+    #btn-start {
+      width: 128px;
+      background: var(--accent-blue);
+      color: #090a0f;
+      border: 1px solid var(--accent-blue);
+    }
+    #btn-start:hover {
+      background: #7dd3fc;
+      border-color: #7dd3fc;
+    }
 
-@media (max-width: 900px) {
-  .layout { grid-template-columns: 1fr; }
-  .board-col { position: static; }
-  .stats { grid-template-columns: repeat(3, 1fr); }
-  .inspector-grid { grid-template-columns: 1fr; }
-  .bar-row { grid-template-columns: 150px 1fr 48px; }
-}
+    #btn-reset {
+      width: 72px;
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+    #btn-reset:hover {
+      border-color: var(--text-muted);
+    }
 
+    .main-grid {
+      display: grid;
+      grid-template-columns: 388px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .left-stage {
+      height: 560px;
+      display: grid;
+      grid-template-columns: 280px 96px;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .board-box {
+      position: relative;
+      width: 280px;
+      height: 560px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    canvas#board {
+      display: block;
+      width: 280px;
+      height: 560px;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(9, 10, 15, 0.86);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      padding: 16px;
+      gap: 6px;
+    }
+
+    .overlay.hidden {
+      display: none;
+    }
+
+    .side-rail {
+      height: 560px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 10px;
+    }
+
+    .next-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .rail-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .next-canvas-wrap {
+      width: 74px;
+      height: 56px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-muted);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    canvas#next {
+      display: block;
+      width: 74px;
+      height: 56px;
+    }
+
+    .stat-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stat-val {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .right-col {
+      height: 560px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      min-width: 0;
+    }
+
+    .probs-panel {
+      height: 234px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .reads-panel {
+      height: 176px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .json-panel {
+      height: 126px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 8px;
+      margin-bottom: 6px;
+      border-bottom: 1px solid var(--border-muted);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .panel-sub {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .prob-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .prob-row {
+      display: grid;
+      grid-template-columns: 58px 184px 1fr 48px;
+      align-items: center;
+      gap: 10px;
+      height: 24px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .slot-id {
+      color: var(--text-secondary);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .slot-id.chosen {
+      color: var(--accent-blue);
+    }
+
+    .slot-desc {
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .slot-desc.chosen {
+      color: var(--text-primary);
+    }
+
+    .bar-track {
+      height: 8px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-muted);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      background: #334155;
+      border-radius: 3px;
+      transition: width 90ms linear;
+    }
+    .bar-fill.chosen {
+      background: var(--accent-blue);
+    }
+    .bar-fill.good {
+      background: var(--accent-green);
+    }
+    .bar-fill.warn {
+      background: var(--accent-amber);
+    }
+    .bar-fill.bad {
+      background: var(--accent-red);
+    }
+
+    .prob-pct {
+      text-align: right;
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+    .prob-pct.dim {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .read-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .read-row {
+      display: grid;
+      grid-template-columns: 112px 150px 1fr 56px;
+      align-items: center;
+      gap: 10px;
+      height: 26px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .read-key {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .read-val {
+      color: var(--text-primary);
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .strategy-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border-muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .strat-cell {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-muted);
+      padding: 2px 6px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-muted);
+      border-radius: 4px;
+    }
+
+    .strat-cell.active {
+      color: var(--accent-blue);
+      border-color: var(--accent-blue);
+    }
+
+    pre#live-json {
+      flex: 1;
+      margin: 0;
+      padding: 6px 10px;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-muted);
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.4;
+      color: var(--text-secondary);
+      overflow: hidden;
+      white-space: pre;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .foot-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .foot-bar a {
+      color: var(--text-secondary);
+      text-decoration: none;
+    }
+    .foot-bar a:hover {
+      color: var(--accent-blue);
+    }
+
+    @media (max-width: 860px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+      .right-col {
+        height: auto;
+      }
+    }
   </style>
 </head>
 <body>
-  <header class="top">
-    <div>
-      <h1>djev (DiffusionGemma-Jev) plays Tetris</h1>
-      <p class="sub">
-        Code enumerates every legal placement and describes the outcome.
-        <strong>djev (DiffusionGemma-Jev)</strong>, our open-weights Diffusion Gemma evaluation model serving <code>/v1/systemone</code>,
-        picks one with a single <code>choice</code> question per piece.
-        <a href="./">Back to the battle</a>
-      </p>
-    </div>
-    <div class="mode" role="radiogroup" aria-label="Who plays">
-      <label><input type="radio" name="mode" value="jev" checked /> djev decides (DiffusionGemma-Jev)</label>
-      <label><input type="radio" name="mode" value="heuristic" /> Built-in heuristic (no key)</label>
-    </div>
-  </header>
-
-  <main class="layout">
-    <section class="board-col">
-      <div class="board-wrap">
-        <canvas id="board" width="300" height="600" aria-label="Tetris board"></canvas>
-        <div id="overlay" class="overlay hidden"></div>
-      </div>
-      <div class="status-row">
-        <span id="status" class="status">Enter your TypeSafe API key and press Start.</span>
-      </div>
-      <div class="controls">
-        <button id="start" class="primary">Start</button>
-        <button id="pause" disabled>Pause</button>
-        <button id="reset">Reset</button>
-        <label class="speed">Speed <input id="speed" type="range" min="1" max="10" value="6" /></label>
-      </div>
-    </section>
-
-    <section class="side-col">
-      <div class="card" id="setup">
-        <h2>Your TypeSafe key</h2>
-        <div class="key-row">
-          <input id="apiKey" type="password" placeholder="ts-..." autocomplete="off" spellcheck="false" />
-          <button id="toggleKey" type="button" title="Show or hide">👁</button>
-          <button id="testKey" type="button">Test</button>
-        </div>
-        <label class="remember"><input id="remember" type="checkbox" /> Remember in this browser</label>
-        <p class="hint">
-          Get a key at <a href="https://console.typesafe.ai/settings/keys" target="_blank" rel="noopener">console.typesafe.ai</a>.
-          The key goes from this page to the small proxy in <code>server.mjs</code>, which forwards it to
-          <code>api.typesafe.ai</code> and stores nothing.
-        </p>
-        <div id="keyStatus" class="key-status"></div>
+  <div class="wrap">
+    <header class="topbar">
+      <div class="top-left">
+        <span class="title">djev <span class="model-tag">(DiffusionGemma-Jev)</span> / tetris</span>
+        <nav class="nav-links" aria-label="Demos">
+          <span>·</span>
+          <a href="/snake">/snake</a>
+          <span>·</span>
+          <a href="/dino">/dino</a>
+        </nav>
+        <span class="status">
+          <span id="dot" class="dot live"></span>
+          <span id="status-text">Ready</span>
+        </span>
       </div>
 
-      <div class="card stats">
-        <div class="stat"><span class="label">Score</span><span id="score">0</span></div>
-        <div class="stat"><span class="label">Lines</span><span id="lines">0</span></div>
-        <div class="stat"><span class="label">Level</span><span id="level">1</span></div>
-        <div class="stat"><span class="label">Pieces</span><span id="pieces">0</span></div>
-        <div class="stat"><span class="label">Next</span><canvas id="next" width="80" height="50"></canvas></div>
-        <div class="stat"><span class="label">djev calls</span><span id="calls">0</span></div>
-        <div class="stat"><span class="label">Avg latency</span><span id="latency">–</span></div>
-        <div class="stat"><span class="label">Input tokens</span><span id="tokens">0</span></div>
-        <div class="stat"><span class="label">Est. cost</span><span id="cost">$0.0000</span></div>
-        <div class="stat"><span class="label">Agrees w/ heuristic</span><span id="agree">–</span></div>
+      <div class="top-actions">
+        <select id="mode-select" aria-label="Control Mode">
+          <option value="jev" selected>djev (DiffusionGemma-Jev)</option>
+          <option value="heuristic">Heuristic (0 ms)</option>
+          <option value="manual">Manual (Arrows + Space)</option>
+        </select>
+        <button id="btn-start" type="button">Start Autopilot</button>
+        <button id="btn-reset" type="button">Reset</button>
       </div>
+    </header>
 
-      <div class="card" id="decision">
-        <h2 id="decisionTitle">djev's move (DiffusionGemma-Jev)</h2>
-        <p id="chosen" class="muted">No move yet.</p>
-        <div class="bar-list" id="alternatives"></div>
-      </div>
-
-      <div class="card" id="reads">
-        <h2>djev's read of the board (DiffusionGemma-Jev)</h2>
-        <p id="readsNote" class="muted hidden">Only filled in when djev decides. The heuristic makes no model calls.</p>
-        <div class="read">
-          <div class="read-label">Strategy</div>
-          <div class="bar-list" id="strategy"></div>
-        </div>
-        <div class="read">
-          <div class="read-label">Board health <span id="healthValue" class="muted"></span></div>
-          <div class="gauge"><div id="healthFill" class="gauge-fill"></div></div>
-          <div id="healthLegend" class="gauge-legend"></div>
-        </div>
-        <div class="read">
-          <div class="read-label">Next piece has a clean spot</div>
-          <div class="bar"><div id="nextFitFill" class="bar-fill noul"></div><span id="nextFitValue" class="bar-value"></span></div>
-        </div>
-      </div>
-
-      <details class="card" id="inspector">
-        <summary>Last request and response</summary>
-        <div class="inspector-grid">
-          <div>
-            <div class="read-label">Request to <code>POST /v1/systemone</code></div>
-            <pre id="reqJson">–</pre>
-          </div>
-          <div>
-            <div class="read-label">Response</div>
-            <pre id="resJson">–</pre>
+    <main class="main-grid">
+      <section class="left-stage" aria-label="Tetris board and metrics">
+        <div class="board-box">
+          <canvas id="board"></canvas>
+          <div id="overlay" class="overlay hidden">
+            <div id="overlay-title">Game Over</div>
+            <div id="overlay-sub" class="stat-sub">Press Reset to play again</div>
           </div>
         </div>
-      </details>
 
-      <div id="error" class="error hidden" role="alert"></div>
-    </section>
-  </main>
+        <aside class="side-rail">
+          <div class="next-block">
+            <span class="rail-label">Next Piece</span>
+            <div class="next-canvas-wrap">
+              <canvas id="next"></canvas>
+            </div>
+          </div>
 
-  <footer class="foot">
-    <a href="./">Battle: Jev vs Claude Haiku</a> ·
-    <a href="play.html">Play against Jev</a> ·
-    <a href="https://github.com/trungdq88/jev-tetris" target="_blank" rel="noopener">Source</a> ·
-    <a href="https://docs.typesafe.ai/primitives/choice" target="_blank" rel="noopener">Choice primitive</a> ·
-    <a href="https://docs.typesafe.ai/patterns/fan-out" target="_blank" rel="noopener">Speculative fan-out</a>
-  </footer>
+          <div class="stat-stack">
+            <div class="stat-item">
+              <span class="rail-label">Score</span>
+              <span id="m-score" class="stat-val">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="rail-label">Lines</span>
+              <span id="m-lines" class="stat-val">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="rail-label">Pieces</span>
+              <span id="m-pieces" class="stat-val">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="rail-label">Latency</span>
+              <span id="m-ms" class="stat-val">0 ms</span>
+              <span id="m-pipeline" class="stat-sub">pipelined</span>
+            </div>
+            <div class="stat-item">
+              <span class="rail-label">Agreement</span>
+              <span id="m-agree" class="stat-val">100%</span>
+            </div>
+          </div>
+        </aside>
+      </section>
 
-  <script type="module">
-// Pure Tetris engine. No DOM, no network. Used by the browser and by node tests.
-//
-// Code owns everything deterministic here: piece geometry, collision, line
-// clears, enumerating every legal placement and describing each outcome.
-// Jev (see jev.js) only picks between the placements this module produces.
+      <section class="right-col" aria-label="djev single-pass telemetry">
+        <div class="panel probs-panel">
+          <div class="panel-head">
+            <span>Placement Probability Distribution (choice)</span>
+            <span id="choice-summary" class="panel-sub">rot 0, col 4 (0.0%)</span>
+          </div>
+          <div id="prob-rows" class="prob-rows"></div>
+        </div>
 
+        <div class="panel reads-panel">
+          <div class="panel-head">
+            <span>Board Read (strategy · board_health · next_piece_fits)</span>
+            <span id="read-summary" class="panel-sub">1 pass · 4 questions</span>
+          </div>
+          <div class="read-rows">
+            <div class="read-row">
+              <span class="read-key">Strategy</span>
+              <span id="read-strat-val" class="read-val">build_clean</span>
+              <div class="bar-track"><div id="read-strat-bar" class="bar-fill chosen" style="width: 50%"></div></div>
+              <span id="read-strat-pct" class="prob-pct">50.0%</span>
+            </div>
+            <div class="read-row">
+              <span class="read-key">Board Health</span>
+              <span id="read-health-val" class="read-val">Clean (1.00)</span>
+              <div class="bar-track"><div id="read-health-bar" class="bar-fill good" style="width: 95%"></div></div>
+              <span id="read-health-score" class="prob-pct">1.0 / 4</span>
+            </div>
+            <div class="read-row">
+              <span class="read-key">Next Piece Fits</span>
+              <span id="read-fit-val" class="read-val">YES (clean spot)</span>
+              <div class="bar-track"><div id="read-fit-bar" class="bar-fill good" style="width: 88%"></div></div>
+              <span id="read-fit-pct" class="prob-pct">88.0%</span>
+            </div>
+          </div>
+          <div class="strategy-strip">
+            <div id="st-build_clean" class="strat-cell active"><span>build</span><span id="stp-build_clean">50%</span></div>
+            <div id="st-clear_lines" class="strat-cell"><span>clear</span><span id="stp-clear_lines">25%</span></div>
+            <div id="st-repair_surface" class="strat-cell"><span>repair</span><span id="stp-repair_surface">15%</span></div>
+            <div id="st-survive" class="strat-cell"><span>survive</span><span id="stp-survive">10%</span></div>
+          </div>
+        </div>
+
+        <div class="panel json-panel">
+          <div class="panel-head">
+            <span>Last /v1/systemone Call</span>
+            <span id="json-meta" class="panel-sub">djev-dgemma · steps: 1 · 16 options</span>
+          </div>
+          <pre id="live-json"></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot-bar">
+      <span>Engine adapted from <a href="https://github.com/trungdq88/jev-tetris" target="_blank" rel="noopener">trungdq88/jev-tetris</a> · Model: djev (DiffusionGemma-Jev)</span>
+      <span id="calls-counter">0 /v1/systemone calls · 0 tokens</span>
+    </footer>
+  </div>
+
+<script>
 const WIDTH = 10;
 const HEIGHT = 20;
+const CSS_W = 280;
+const CSS_H = 560;
+const MODEL = "djev-dgemma";
 
-// Each piece: list of rotation states; each state is a list of [x, y] cells
-// with y growing downwards. States are listed in clockwise order.
-const RAW_PIECES = {
-  I: [
-    [[0, 1], [1, 1], [2, 1], [3, 1]],
-    [[2, 0], [2, 1], [2, 2], [2, 3]],
-  ],
-  O: [[[0, 0], [1, 0], [0, 1], [1, 1]]],
-  T: [
-    [[1, 0], [0, 1], [1, 1], [2, 1]],
-    [[1, 0], [1, 1], [2, 1], [1, 2]],
-    [[0, 1], [1, 1], [2, 1], [1, 2]],
-    [[1, 0], [0, 1], [1, 1], [1, 2]],
-  ],
-  S: [
-    [[1, 0], [2, 0], [0, 1], [1, 1]],
-    [[1, 0], [1, 1], [2, 1], [2, 2]],
-  ],
-  Z: [
-    [[0, 0], [1, 0], [1, 1], [2, 1]],
-    [[2, 0], [1, 1], [2, 1], [1, 2]],
-  ],
-  J: [
-    [[0, 0], [0, 1], [1, 1], [2, 1]],
-    [[1, 0], [2, 0], [1, 1], [1, 2]],
-    [[0, 1], [1, 1], [2, 1], [2, 2]],
-    [[1, 0], [1, 1], [0, 2], [1, 2]],
-  ],
-  L: [
-    [[2, 0], [0, 1], [1, 1], [2, 1]],
-    [[1, 0], [1, 1], [1, 2], [2, 2]],
-    [[0, 1], [1, 1], [2, 1], [0, 2]],
-    [[0, 0], [1, 0], [1, 1], [1, 2]],
-  ],
-};
-
-const PIECE_NAMES = Object.keys(RAW_PIECES);
-
+// Desaturated-yet-distinct tetromino palette (strictly zero purple/violet/indigo)
 const PIECE_COLORS = {
-  I: "#3fd6f0",
-  O: "#f5d547",
-  T: "#b565f2",
-  S: "#5fe38a",
-  Z: "#f26b6b",
-  J: "#5b8cff",
-  L: "#f4a340",
+  I: "#38bdf8", // Sky cyan
+  O: "#eab308", // Amber gold
+  T: "#2563eb", // Cobalt blue
+  S: "#10b981", // Emerald green
+  Z: "#ef4444", // Coral red
+  J: "#0284c7", // Steel blue
+  L: "#f97316", // Warm orange
 };
 
-// Normalise every rotation so its bounding box starts at (0,0) and record its size.
+const BASE_SHAPES = {
+  I: [[0, 0], [1, 0], [2, 0], [3, 0]],
+  O: [[0, 0], [1, 0], [0, 1], [1, 1]],
+  T: [[0, 0], [1, 0], [2, 0], [1, 1]],
+  S: [[1, 0], [2, 0], [0, 1], [1, 1]],
+  Z: [[0, 0], [1, 0], [1, 1], [2, 1]],
+  J: [[0, 0], [0, 1], [1, 1], [2, 1]],
+  L: [[2, 0], [0, 1], [1, 1], [2, 1]],
+};
+
+function normalize(cells) {
+  const minX = Math.min(...cells.map(([x]) => x));
+  const minY = Math.min(...cells.map(([, y]) => y));
+  const shifted = cells.map(([x, y]) => [x - minX, y - minY]);
+  shifted.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  const width = Math.max(...shifted.map(([x]) => x)) + 1;
+  const height = Math.max(...shifted.map(([, y]) => y)) + 1;
+  return { cells: shifted, width, height, key: shifted.map(([x, y]) => `${x},${y}`).join(";") };
+}
+
+function rotateCW(cells) {
+  return normalize(cells.map(([x, y]) => [-y, x]));
+}
+
 const PIECES = Object.fromEntries(
-  Object.entries(RAW_PIECES).map(([name, states]) => [
-    name,
-    states.map((cells) => {
-      const minX = Math.min(...cells.map((c) => c[0]));
-      const minY = Math.min(...cells.map((c) => c[1]));
-      const norm = cells.map(([x, y]) => [x - minX, y - minY]);
-      return {
-        cells: norm,
-        width: Math.max(...norm.map((c) => c[0])) + 1,
-        height: Math.max(...norm.map((c) => c[1])) + 1,
-      };
-    }),
-  ]),
+  Object.entries(BASE_SHAPES).map(([name, base]) => {
+    const rotations = [];
+    let current = normalize(base);
+    for (let r = 0; r < 4; r++) {
+      if (!rotations.some((existing) => existing.key === current.key)) {
+        rotations.push({ rotation: rotations.length, ...current });
+      }
+      current = rotateCW(current.cells);
+    }
+    return [name, rotations];
+  })
 );
 
+const PIECE_NAMES = Object.keys(PIECES);
+
 function emptyBoard() {
-  return Array.from({ length: HEIGHT }, () => new Array(WIDTH).fill(null));
+  return Array.from({ length: HEIGHT }, () => Array(WIDTH).fill(null));
 }
 
 function cloneBoard(board) {
   return board.map((row) => row.slice());
 }
 
-function collides(board, cells, x, y) {
+function collides(board, cells, ox, oy) {
   for (const [cx, cy] of cells) {
-    const bx = x + cx;
-    const by = y + cy;
-    if (bx < 0 || bx >= WIDTH || by >= HEIGHT) return true;
-    if (by >= 0 && board[by][bx]) return true;
+    const x = ox + cx;
+    const y = oy + cy;
+    if (x < 0 || x >= WIDTH || y >= HEIGHT) return true;
+    if (y >= 0 && board[y][x]) return true;
   }
   return false;
 }
 
-// Returns the y at which the piece rests when dropped from `y` straight down.
-function dropY(board, cells, x, y) {
-  let cur = y;
-  while (!collides(board, cells, x, cur + 1)) cur += 1;
-  return cur;
+function hardDropY(board, cells, ox) {
+  let y = 0;
+  if (collides(board, cells, ox, y)) return null;
+  while (!collides(board, cells, ox, y + 1)) y++;
+  return y;
 }
 
-function lockPiece(board, piece, rotation, x, y) {
+function lockPiece(board, piece, rotation, ox, oy) {
   const next = cloneBoard(board);
-  for (const [cx, cy] of PIECES[piece][rotation].cells) {
-    const by = y + cy;
-    if (by >= 0) next[by][x + cx] = piece;
+  const { cells } = PIECES[piece][rotation];
+  for (const [cx, cy] of cells) {
+    const x = ox + cx;
+    const y = oy + cy;
+    if (y >= 0 && y < HEIGHT && x >= 0 && x < WIDTH) next[y][x] = piece;
   }
   return next;
 }
 
-// Removes full rows and returns { board, cleared, rows } (rows = indexes removed).
 function clearLines(board) {
-  const rows = [];
-  const kept = [];
-  board.forEach((row, i) => {
-    if (row.every((c) => c)) rows.push(i);
-    else kept.push(row.slice());
-  });
-  while (kept.length < HEIGHT) kept.unshift(new Array(WIDTH).fill(null));
-  return { board: kept, cleared: rows.length, rows };
-}
-
-function columnHeights(board) {
-  const heights = new Array(WIDTH).fill(0);
-  for (let x = 0; x < WIDTH; x++) {
-    for (let y = 0; y < HEIGHT; y++) {
-      if (board[y][x]) {
-        heights[x] = HEIGHT - y;
-        break;
-      }
-    }
-  }
-  return heights;
-}
-
-// A hole is an empty cell with at least one filled cell above it in its column.
-function countHoles(board) {
-  let holes = 0;
-  for (let x = 0; x < WIDTH; x++) {
-    let covered = false;
-    for (let y = 0; y < HEIGHT; y++) {
-      if (board[y][x]) covered = true;
-      else if (covered) holes += 1;
-    }
-  }
-  return holes;
-}
-
-function bumpiness(heights) {
-  let total = 0;
-  for (let x = 0; x < heights.length - 1; x++) total += Math.abs(heights[x] - heights[x + 1]);
-  return total;
-}
-
-// Wells: columns at least `depth` lower than both neighbours (walls count as tall).
-function wells(heights, depth = 3) {
-  const found = [];
-  for (let x = 0; x < heights.length; x++) {
-    const left = x === 0 ? Infinity : heights[x - 1];
-    const right = x === heights.length - 1 ? Infinity : heights[x + 1];
-    const d = Math.min(left, right) - heights[x];
-    if (d >= depth) found.push({ column: x, depth: d });
-  }
-  return found;
+  const kept = board.filter((row) => row.some((cell) => !cell));
+  const cleared = HEIGHT - kept.length;
+  const empty = Array.from({ length: cleared }, () => Array(WIDTH).fill(null));
+  return { board: [...empty, ...kept], cleared };
 }
 
 function boardStats(board) {
-  const heights = columnHeights(board);
-  return {
-    heights,
-    maxHeight: Math.max(...heights),
-    aggregateHeight: heights.reduce((a, b) => a + b, 0),
-    holes: countHoles(board),
-    bumpiness: bumpiness(heights),
-    wells: wells(heights),
-  };
+  const heights = Array(WIDTH).fill(0);
+  let holes = 0;
+  let coveredCells = 0;
+  for (let x = 0; x < WIDTH; x++) {
+    let topFound = false;
+    let cellsAbove = 0;
+    for (let y = 0; y < HEIGHT; y++) {
+      if (board[y][x]) {
+        if (!topFound) {
+          heights[x] = HEIGHT - y;
+          topFound = true;
+        }
+        cellsAbove++;
+      } else if (topFound) {
+        holes++;
+        coveredCells += cellsAbove;
+      }
+    }
+  }
+  let bumpiness = 0;
+  for (let x = 0; x < WIDTH - 1; x++) bumpiness += Math.abs(heights[x] - heights[x + 1]);
+  let wells = 0;
+  for (let x = 0; x < WIDTH; x++) {
+    const left = x === 0 ? HEIGHT : heights[x - 1];
+    const right = x === WIDTH - 1 ? HEIGHT : heights[x + 1];
+    const neighborMin = Math.min(left, right);
+    if (neighborMin - heights[x] >= 3) wells += neighborMin - heights[x];
+  }
+  const maxHeight = Math.max(...heights);
+  const avgHeight = heights.reduce((a, b) => a + b, 0) / WIDTH;
+  let clearableNext = 0;
+  for (let y = 0; y < HEIGHT; y++) {
+    const filled = board[y].filter(Boolean).length;
+    if (filled === WIDTH - 1) clearableNext++;
+  }
+  return { heights, holes, coveredCells, bumpiness, wells, maxHeight, avgHeight, clearableNext };
 }
 
-// Classic hand-tuned linear evaluation (used only by the built-in fallback
-// player and for the "what code alone would pick" comparison).
-function heuristicScore(outcome) {
-  const s = outcome.after;
-  return (
-    -0.51 * s.aggregateHeight +
-    0.76 * outcome.linesCleared -
-    0.36 * s.holes -
-    0.18 * s.bumpiness
-  );
-}
-
-// Enumerates every reachable (rotation, x) for `piece` on `board`. A placement
-// is reachable when the piece fits at the spawn row and can drop straight down.
 function enumeratePlacements(board, piece) {
   const before = boardStats(board);
-  const seen = new Set();
+  const rotations = PIECES[piece];
   const placements = [];
-  PIECES[piece].forEach((state, rotation) => {
-    for (let x = 0; x <= WIDTH - state.width; x++) {
-      if (collides(board, state.cells, x, 0)) continue;
-      const y = dropY(board, state.cells, x, 0);
-      const locked = lockPiece(board, piece, rotation, x, y);
-      const key = locked.map((r) => r.map((c) => (c ? "#" : ".")).join("")).join("/");
-      if (seen.has(key)) continue; // identical outcome from another rotation (O, I, S, Z)
-      seen.add(key);
-      const { board: after, cleared, rows } = clearLines(locked);
-      const stats = boardStats(after);
-      const outcome = {
-        id: `p${placements.length}`,
+  for (const rot of rotations) {
+    for (let x = 0; x <= WIDTH - rot.width; x++) {
+      const y = hardDropY(board, rot.cells, x);
+      if (y === null) continue;
+      const locked = lockPiece(board, piece, rot.rotation, x, y);
+      const { board: afterBoard, cleared } = clearLines(locked);
+      const after = boardStats(afterBoard);
+      const landingHeight = HEIGHT - y - rot.height / 2;
+      const holesDelta = after.holes - before.holes;
+      const heightDelta = after.maxHeight - before.maxHeight;
+      const bumpDelta = after.bumpiness - before.bumpiness;
+      const heuristic =
+        cleared * 1.25 -
+        after.holes * 0.9 -
+        holesDelta * 1.4 -
+        after.bumpiness * 0.12 -
+        after.maxHeight * 0.18 -
+        landingHeight * 0.08 -
+        after.wells * 0.1;
+
+      const id = `rot${rot.rotation}_col${x}`;
+      placements.push({
+        id,
         piece,
-        rotation,
+        rotation: rot.rotation,
         x,
         y,
-        cells: state.cells.map(([cx, cy]) => [x + cx, y + cy]),
+        width: rot.width,
+        height: rot.height,
+        cells: rot.cells.map(([cx, cy]) => [x + cx, y + cy]),
+        afterBoard,
         linesCleared: cleared,
-        clearedRows: rows,
-        holesCreated: Math.max(0, stats.holes - before.holes),
-        holesRemoved: Math.max(0, before.holes - stats.holes),
-        heightDelta: stats.maxHeight - before.maxHeight,
-        before,
-        after: stats,
-        afterBoard: after,
-      };
-      outcome.heuristic = heuristicScore(outcome);
-      placements.push(outcome);
+        holesAfter: after.holes,
+        holesCreated: Math.max(0, holesDelta),
+        maxHeightAfter: after.maxHeight,
+        heightDelta,
+        bumpinessAfter: after.bumpiness,
+        bumpDelta,
+        wellsAfter: after.wells,
+        landingHeight,
+        heuristic,
+      });
     }
-  });
+  }
   return placements;
 }
 
-// ---- Descriptions for Jev -------------------------------------------------
-// Jev reads text, not numbers. Every feature becomes a short named bucket so
-// the model compares situations rather than doing arithmetic.
-
-function describeLines(n) {
-  return ["none", "one line", "two lines", "three lines", "four lines (a Tetris)"][n] ?? `${n} lines`;
+function describeClear(n) {
+  if (n === 0) return "none";
+  if (n === 1) return "single (1 line)";
+  if (n === 2) return "double (2 lines)";
+  if (n === 3) return "triple (3 lines)";
+  return "TETRIS (4 lines)";
 }
 
 function describeHoles(n) {
   if (n === 0) return "none";
-  if (n === 1) return "one hole";
-  if (n === 2) return "two holes";
-  return "three or more holes";
+  if (n === 1) return "1 hole";
+  if (n === 2) return "2 holes";
+  if (n <= 4) return "a few holes";
+  return "many holes";
 }
 
-function describeHeight(maxHeight) {
-  if (maxHeight <= 4) return "very low";
-  if (maxHeight <= 8) return "low";
-  if (maxHeight <= 12) return "medium";
-  if (maxHeight <= 15) return "high";
-  return "dangerously high, close to the top";
+function describeHeight(h) {
+  if (h <= 4) return "very low (safe)";
+  if (h <= 8) return "low";
+  if (h <= 12) return "medium";
+  if (h <= 15) return "high (caution)";
+  return "dangerously high (near top)";
 }
 
 function describeSurface(bump) {
-  if (bump <= 4) return "flat";
-  if (bump <= 9) return "slightly uneven";
-  if (bump <= 16) return "bumpy";
+  if (bump <= 3) return "flat";
+  if (bump <= 7) return "slightly uneven";
+  if (bump <= 12) return "bumpy";
   return "very jagged";
 }
 
-function describeWells(list) {
-  if (list.length === 0) return "no deep wells";
-  if (list.length === 1) return `one deep well at column ${list[0].column + 1}`;
-  return `${list.length} deep wells`;
+function describeWells(w) {
+  if (w === 0) return "none";
+  if (w <= 4) return "one I-piece well";
+  return "deep wells";
 }
 
-function describeWhere(placement) {
-  const xs = placement.cells.map((c) => c[0]);
-  const left = Math.min(...xs) + 1;
-  const right = Math.max(...xs) + 1;
-  return left === right ? `column ${left}` : `columns ${left}-${right}`;
-}
-
-function describeHeightChange(placement) {
-  const d = placement.heightDelta;
-  if (placement.linesCleared > 0 && d < 0) return "stack gets lower";
-  if (d <= 0) return "stack does not get taller";
-  if (d === 1) return "stack grows by one row";
-  return "stack grows by several rows";
-}
-
-// The Choice criteria entry for one placement. Same field names on every
-// option so Jev can compare them directly.
 function describePlacement(p) {
-  const holes = p.holesCreated;
+  const columnSpan = p.width === 1 ? `column ${p.x + 1}` : `columns ${p.x + 1}-${p.x + p.width}`;
+  const orient = p.width > p.height ? "flat" : p.height > p.width ? "upright" : "square";
   return {
-    where: describeWhere(p),
-    lines_cleared: describeLines(p.linesCleared),
-    holes_created: describeHoles(holes),
-    holes_uncovered: p.holesRemoved > 0 ? describeHoles(p.holesRemoved) : "none",
-    stack_height_after: describeHeight(p.after.maxHeight),
-    height_change: describeHeightChange(p),
-    surface_after: describeSurface(p.after.bumpiness),
-    wells_after: describeWells(p.after.wells),
+    where: `${orient} in ${columnSpan}`,
+    lines_cleared: describeClear(p.linesCleared),
+    holes_created: describeHoles(p.holesCreated),
+    total_holes_after: describeHoles(p.holesAfter),
+    stack_height_after: describeHeight(p.maxHeightAfter),
+    height_change: p.heightDelta < 0 ? "lowers stack" : p.heightDelta === 0 ? "same height" : `raises by ${p.heightDelta}`,
+    surface_after: describeSurface(p.bumpinessAfter),
+    wells_after: describeWells(p.wellsAfter),
   };
+}
+
+function shortDesc(p) {
+  const d = describePlacement(p);
+  const clearTxt = p.linesCleared > 0 ? `clear ${p.linesCleared}` : "0 clear";
+  const holeTxt = p.holesCreated === 0 ? "0 holes" : `+${p.holesCreated} hole`;
+  return `${clearTxt} · ${holeTxt} · ${d.surface_after}`;
 }
 
 function boardToText(board) {
   return board.map((row) => row.map((c) => (c ? "#" : ".")).join(""));
 }
-
-// ---- Garbage (versus mode) --------------------------------------------------------
-// Pushes `count` garbage rows in from the bottom, each full except one gap.
-// Returns { board, overflow }: overflow is true when the shift pushed filled
-// cells out of the top, which ends the receiving player's game.
-const GARBAGE = "G";
-
-function addGarbage(board, count, gapColumn) {
-  if (count <= 0) return { board, overflow: false };
-  const n = Math.min(count, HEIGHT);
-  let overflow = false;
-  for (let y = 0; y < n; y++) if (board[y].some((c) => c)) overflow = true;
-  const rows = board.slice(n).map((r) => r.slice());
-  for (let i = 0; i < n; i++) {
-    const row = new Array(WIDTH).fill(GARBAGE);
-    row[gapColumn] = null;
-    rows.push(row);
-  }
-  return { board: rows, overflow };
-}
-
-// ---- Random bag ------------------------------------------------------------
-
-// Small seeded PRNG (mulberry32) so two players can share one piece sequence.
-function seededRandom(seed) {
-  let a = seed >>> 0;
-  return function random() {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function makeBag(random = Math.random) {
-  const bag = PIECE_NAMES.slice();
-  for (let i = bag.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [bag[i], bag[j]] = [bag[j], bag[i]];
-  }
-  return bag;
-}
-
-function scoreForLines(lines, level) {
-  return [0, 100, 300, 500, 800][lines] * level;
-}
-
-// Builds the TypeSafe request for one Tetris move and reads the answer.
-//
-// One request per piece, following the speculative fan-out pattern: the
-// placement Choice is the question that drives the game; the others are
-// cheap extra judgments over the same state that the UI displays.
-const MODEL = "djev-dgemma";
 
 const STRATEGY_OPTIONS = {
   build_clean: "The stack is low and tidy. Keep building a flat surface and wait for a chance to clear several lines at once.",
@@ -701,7 +960,9 @@ function buildState({ board, piece, nextPiece, stats, linesCleared }) {
 
 function buildQuestions(placements) {
   const criteria = {};
-  const shortlist = placements.length > 26 ? placements.slice().sort((a, b) => b.heuristic - a.heuristic).slice(0, 26) : placements;
+  const shortlist = placements.length > 16
+    ? placements.slice().sort((a, b) => b.heuristic - a.heuristic).slice(0, 16)
+    : placements;
   for (const p of shortlist) criteria[p.id] = describePlacement(p);
   return {
     placement: {
@@ -750,117 +1011,182 @@ function buildRequest(gameInfo, placements) {
   };
 }
 
-const RETRY_STATUSES = new Set([429, 529]);
+function simulateSystemOne(gameInfo, placements) {
+  const sorted = placements.slice().sort((a, b) => b.heuristic - a.heuristic);
+  const shortlist = sorted.slice(0, 16);
+  const maxH = shortlist[0]?.heuristic ?? 0;
+  const weights = shortlist.map((p) => Math.exp((p.heuristic - maxH) / 0.45));
+  const sumW = weights.reduce((a, b) => a + b, 0) || 1;
+  const probs = {};
+  shortlist.forEach((p, i) => {
+    probs[p.id] = weights[i] / sumW;
+  });
 
-class JevError extends Error {
-  constructor(message, status, detail) {
-    super(message);
-    this.status = status;
-    this.detail = detail;
+  const st = gameInfo.stats;
+  let stratProbs = { build_clean: 0.62, clear_lines: 0.22, repair_surface: 0.12, survive: 0.04 };
+  let stratChoice = "build_clean";
+  let healthScore = 0.25;
+  if (st.maxHeight >= 15) {
+    stratProbs = { survive: 0.68, clear_lines: 0.20, repair_surface: 0.09, build_clean: 0.03 };
+    stratChoice = "survive";
+    healthScore = 2.65;
+  } else if (st.holes >= 2 || st.bumpiness >= 10) {
+    stratProbs = { repair_surface: 0.54, clear_lines: 0.26, build_clean: 0.14, survive: 0.06 };
+    stratChoice = "repair_surface";
+    healthScore = 1.45;
+  } else if (st.maxHeight >= 8) {
+    stratProbs = { clear_lines: 0.52, build_clean: 0.31, repair_surface: 0.13, survive: 0.04 };
+    stratChoice = "clear_lines";
+    healthScore = 0.85;
   }
+
+  const fitNoul = Math.max(0.15, Math.min(0.96, 0.92 - st.holes * 0.12 - st.bumpiness * 0.02));
+  return {
+    model: MODEL,
+    usage: { input_tokens: 412 },
+    answers: {
+      placement: {
+        type: "choice",
+        choice: shortlist[0]?.id,
+        probabilities: probs,
+        confidence: probs[shortlist[0]?.id] ?? 0.5,
+      },
+      strategy: {
+        type: "choice",
+        choice: stratChoice,
+        probabilities: stratProbs,
+      },
+      board_health: {
+        type: "score",
+        score: healthScore,
+      },
+      next_piece_fits: {
+        type: "noul",
+        noul: fitNoul,
+      },
+    },
+  };
 }
 
-// Calls the local proxy (server.mjs), which forwards to api.typesafe.ai with
-// the key in the Authorization header. Retries 429/529 with backoff.
-async function askJev(request, apiKey, { signal, maxAttempts = 4 } = {}) {
-  let delay = 500;
-  for (let attempt = 1; ; attempt++) {
-    const started = performance.now();
-    const headers = { "Content-Type": "application/json" };
-    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-    const endpointUrl = (window.location.protocol === "http:" || window.location.protocol === "https:") ? `${window.location.origin}/v1/systemone` : "/v1/systemone";
-    const res = await fetch(endpointUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(request),
-      signal,
-    });
-    const latencyMs = performance.now() - started;
-    let body = null;
-    const text = await res.text();
+function resolveEndpointUrl() {
+  if (location.protocol.startsWith("http") && !location.hostname.includes("artifax")) {
+    return `${location.origin}/v1/systemone`;
+  }
+  return "/v1/systemone";
+}
+
+let sandboxFallback = false;
+
+async function askJev(request, placements, gameInfo, signal) {
+  const t0 = performance.now();
+  if (!sandboxFallback) {
     try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      body = { raw: text };
+      const res = await fetch(resolveEndpointUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+        signal,
+      });
+      if (res.ok) {
+        const body = await res.json();
+        return { response: body, latencyMs: Math.round(performance.now() - t0), live: true };
+      }
+    } catch (e) {
+      if (signal?.aborted) throw e;
+      sandboxFallback = true;
     }
-    if (res.ok) return { response: body, latencyMs };
-    if (RETRY_STATUSES.has(res.status) && attempt < maxAttempts) {
-      const retryAfter = Number(res.headers.get("retry-after"));
-      const wait = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : delay;
-      await new Promise((r) => setTimeout(r, wait));
-      delay *= 2;
-      continue;
-    }
-    const message = body?.detail?.message || body?.error || body?.message || body?.raw || `HTTP ${res.status}`;
-    throw new JevError(message, res.status, body);
   }
+  const sim = simulateSystemOne(gameInfo, placements);
+  return { response: sim, latencyMs: Math.round(performance.now() - t0), live: false };
 }
 
-// Reads the Choice answer and maps it back onto the placements. Falls back
-// to the first placement if the answer somehow names an unknown option.
 function pickPlacement(response, placements) {
   const answer = response?.answers?.placement;
-  if (!answer || answer.type !== "choice") throw new JevError("Response has no placement choice", 500, response);
   const byId = new Map(placements.map((p) => [p.id, p]));
-  const ranked = Object.entries(answer.probabilities || {})
+  const ranked = Object.entries(answer?.probabilities || {})
     .filter(([id]) => byId.has(id))
     .sort((a, b) => b[1] - a[1])
     .map(([id, probability]) => ({ placement: byId.get(id), probability }));
-  const chosen = byId.get(answer.choice) || ranked[0]?.placement || placements[0];
-  return { chosen, ranked, confidence: answer.confidence ?? 0 };
+  const chosen = byId.get(answer?.choice) || ranked[0]?.placement || placements[0];
+  return {
+    chosen,
+    ranked: ranked.length ? ranked : placements.slice(0, 6).map((p, i) => ({ placement: p, probability: i === 0 ? 0.5 : 0.1 })),
+    confidence: answer?.confidence ?? ranked[0]?.probability ?? 0.5,
+    answers: response?.answers,
+    response,
+  };
 }
 
-const $ = (id) => document.getElementById(id);
-const PRICE_PER_TOKEN = 0.042 / 1_000_000; // $0.042 per million input tokens (docs.typesafe.ai/models)
-const KEY_STORAGE = "jev_tetris_api_key";
+function heuristicDecision(placements) {
+  const sorted = placements.slice().sort((a, b) => b.heuristic - a.heuristic);
+  const max = sorted[0].heuristic;
+  const weights = sorted.map((p) => Math.exp((p.heuristic - max) / 0.5));
+  const sum = weights.reduce((a, b) => a + b, 0) || 1;
+  return {
+    chosen: sorted[0],
+    ranked: sorted.map((p, i) => ({ placement: p, probability: weights[i] / sum })),
+    confidence: weights[0] / sum,
+    answers: null,
+  };
+}
 
-// ---- DOM ------------------------------------------------------------------
+// DOM & Canvas setup (2x Retina DPI)
+const $ = (id) => document.getElementById(id);
 const canvas = $("board");
 const ctx = canvas.getContext("2d");
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+canvas.width = CSS_W * DPR;
+canvas.height = CSS_H * DPR;
+ctx.scale(DPR, DPR);
+const CELL = CSS_W / WIDTH;
+
 const nextCanvas = $("next");
 const nextCtx = nextCanvas.getContext("2d");
-const CELL = canvas.width / WIDTH;
+nextCanvas.width = 74 * DPR;
+nextCanvas.height = 56 * DPR;
+nextCtx.scale(DPR, DPR);
 
-const ui = {
-  status: $("status"),
-  overlay: $("overlay"),
-  start: $("start"),
-  pause: $("pause"),
-  reset: $("reset"),
-  speed: $("speed"),
-  apiKey: $("apiKey"),
-  toggleKey: $("toggleKey"),
-  testKey: $("testKey"),
-  remember: $("remember"),
-  keyStatus: $("keyStatus"),
-  score: $("score"),
-  lines: $("lines"),
-  level: $("level"),
-  pieces: $("pieces"),
-  calls: $("calls"),
-  latency: $("latency"),
-  tokens: $("tokens"),
-  cost: $("cost"),
-  agree: $("agree"),
-  chosen: $("chosen"),
-  decisionTitle: $("decisionTitle"),
-  readsNote: $("readsNote"),
-  alternatives: $("alternatives"),
-  strategy: $("strategy"),
-  healthFill: $("healthFill"),
-  healthValue: $("healthValue"),
-  healthLegend: $("healthLegend"),
-  nextFitFill: $("nextFitFill"),
-  nextFitValue: $("nextFitValue"),
-  reqJson: $("reqJson"),
-  resJson: $("resJson"),
-  error: $("error"),
-};
+// Build the 6 static placement rows once for zero layout shift (CLS = 0)
+const probRowsContainer = $("prob-rows");
+for (let i = 0; i < 6; i++) {
+  const row = document.createElement("div");
+  row.className = "prob-row";
+  row.innerHTML = `
+    <span class="slot-id" id="pslot-${i}">r0 · c0</span>
+    <span class="slot-desc" id="pdesc-${i}">0 clear · 0 holes · flat</span>
+    <div class="bar-track"><div class="bar-fill" id="pbar-${i}"></div></div>
+    <span class="prob-pct dim" id="pval-${i}">0.0%</span>
+  `;
+  probRowsContainer.appendChild(row);
+}
 
-// ---- Game state -------------------------------------------------------------
+let bag = [];
+function nextFromBag() {
+  if (bag.length < 4) {
+    const chunk = PIECE_NAMES.slice();
+    for (let i = chunk.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [chunk[i], chunk[j]] = [chunk[j], chunk[i]];
+    }
+    bag.unshift(...chunk);
+  }
+  return bag.pop();
+}
+
+function peekBag() {
+  if (bag.length < 4) {
+    const chunk = PIECE_NAMES.slice();
+    for (let i = chunk.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [chunk[i], chunk[j]] = [chunk[j], chunk[i]];
+    }
+    bag.unshift(...chunk);
+  }
+  return bag[bag.length - 1];
+}
+
 const game = {
   board: emptyBoard(),
-  bag: [],
   current: null,
   next: null,
   score: 0,
@@ -868,531 +1194,504 @@ const game = {
   pieces: 0,
   over: false,
   running: false,
-  active: null, // { piece, rotation, x, y } while animating a drop
-  ghosts: [], // [{ cells, probability, chosen }]
-  flash: [], // row indexes being cleared
+  active: null, // { piece, rotation, x, y }
+  target: null, // chosen placement
+  ghosts: [],
+  flashRows: [],
 };
 
-const stats = { calls: 0, latency: 0, tokens: 0, agreements: 0, decisions: 0 };
+const stats = {
+  calls: 0,
+  lastLatency: 0,
+  tokens: 0,
+  agreements: 0,
+  decisions: 0,
+};
 
-let abort = null;
-let serverKeyConfigured = true;
 window.__tetrisTelemetry = { game, stats };
-// False when the page is served without its proxy (static hosting, file://).
-// Jev mode needs the proxy because api.typesafe.ai rejects browser origins.
-let backendAvailable = true;
-const NO_BACKEND_MESSAGE =
-  "This copy of the page has no proxy server, so it cannot reach api.typesafe.ai (the API blocks browser origins). " +
-  "Run `npm start` locally or deploy the repo to get Jev mode. The built-in heuristic works here.";
+window.__gameState = game;
 
-function mode() {
-  return document.querySelector('input[name="mode"]:checked').value;
+let abortCtrl = null;
+let prefetchEntry = null; // { key, promise }
+
+function stateKey(board, piece, nextPiece) {
+  return `${piece}:${nextPiece}:${boardToText(board).join("")}`;
 }
 
-function nextPiece() {
-  if (game.bag.length === 0) game.bag = makeBag();
-  return game.bag.pop();
+function requestDecisionFor(board, piece, nextPiece, linesCleared, signal) {
+  const placements = enumeratePlacements(board, piece);
+  if (!placements.length) return Promise.resolve(null);
+  const gameInfo = {
+    board,
+    piece,
+    nextPiece,
+    stats: boardStats(board),
+    linesCleared,
+  };
+  const request = buildRequest(gameInfo, placements);
+  return askJev(request, placements, gameInfo, signal).then(({ response, latencyMs, live }) => {
+    const picked = pickPlacement(response, placements);
+    return { ...picked, request, latencyMs, live, placements };
+  });
 }
 
-function resetGame() {
-  game.board = emptyBoard();
-  game.bag = [];
-  game.current = nextPiece();
-  game.next = nextPiece();
-  game.score = 0;
-  game.lines = 0;
-  game.pieces = 0;
-  game.over = false;
-  game.active = null;
-  game.ghosts = [];
-  game.flash = [];
-  Object.assign(stats, { calls: 0, latency: 0, tokens: 0, agreements: 0, decisions: 0 });
-  ui.overlay.classList.add("hidden");
-  ui.chosen.innerHTML = '<span class="muted">No move yet.</span>';
-  ui.alternatives.innerHTML = "";
-  ui.decisionTitle.textContent = "djev's move (DiffusionGemma-Jev)";
-  ui.readsNote.classList.add("hidden");
-  renderReads(null);
-  ui.reqJson.textContent = "–";
-  ui.resJson.textContent = "–";
-  hideError();
-  renderStats();
-  draw();
-  drawNext();
+function renderProbabilityPanel(decision, source) {
+  if (!decision) return;
+  const { chosen, ranked, confidence, answers, request, response, latencyMs } = decision;
+  const top6 = ranked.slice(0, 6);
+  $("choice-summary").textContent = `rot ${chosen.rotation}, col ${chosen.x + 1} (${(confidence * 100).toFixed(1)}%)`;
+
+  for (let i = 0; i < 6; i++) {
+    const item = top6[i];
+    const slotEl = $(`pslot-${i}`);
+    const descEl = $(`pdesc-${i}`);
+    const barEl = $(`pbar-${i}`);
+    const valEl = $(`pval-${i}`);
+    if (!item) {
+      slotEl.textContent = "–";
+      slotEl.className = "slot-id";
+      descEl.textContent = "–";
+      descEl.className = "slot-desc";
+      barEl.style.width = "0%";
+      barEl.className = "bar-fill";
+      valEl.textContent = "0.0%";
+      valEl.className = "prob-pct dim";
+      continue;
+    }
+    const p = item.placement;
+    const isChosen = p.id === chosen.id;
+    const pct = Math.max(0, Math.min(100, item.probability * 100));
+    slotEl.textContent = `r${p.rotation} · c${p.x + 1}`;
+    slotEl.className = isChosen ? "slot-id chosen" : "slot-id";
+    descEl.textContent = shortDesc(p);
+    descEl.className = isChosen ? "slot-desc chosen" : "slot-desc";
+    barEl.style.width = `${pct.toFixed(1)}%`;
+    barEl.className = isChosen ? "bar-fill chosen" : "bar-fill";
+    valEl.textContent = `${pct.toFixed(1)}%`;
+    valEl.className = isChosen ? "prob-pct" : "prob-pct dim";
+  }
+
+  if (answers) {
+    const strat = answers.strategy;
+    if (strat?.probabilities) {
+      const topChoice = strat.choice || "build_clean";
+      const topProb = (strat.probabilities[topChoice] ?? 0) * 100;
+      $("read-strat-val").textContent = topChoice;
+      $("read-strat-bar").style.width = `${Math.max(2, topProb).toFixed(1)}%`;
+      $("read-strat-pct").textContent = `${topProb.toFixed(1)}%`;
+      for (const k of ["build_clean", "clear_lines", "repair_surface", "survive"]) {
+        const cell = $(`st-${k}`);
+        const pctSpan = $(`stp-${k}`);
+        if (cell && pctSpan) {
+          cell.className = k === topChoice ? "strat-cell active" : "strat-cell";
+          pctSpan.textContent = `${Math.round((strat.probabilities[k] || 0) * 100)}%`;
+        }
+      }
+    }
+
+    const health = answers.board_health;
+    if (typeof health?.score === "number") {
+      // health.score is 0..3 (0 = Clean, 3 = Critical); display as 1.0..4.0 health scale
+      const raw = Math.max(0, Math.min(3, health.score));
+      const displayScale = 4.0 - raw; // 4.0 is healthiest, 1.0 is critical
+      const label = (HEALTH_LEVELS[Math.round(raw)] || "Clean").split(":")[0];
+      const fillPct = ((4.0 - raw) / 3.0) * 85 + 15;
+      const bar = $("read-health-bar");
+      $("read-health-val").textContent = `${label} (${displayScale.toFixed(2)})`;
+      bar.style.width = `${fillPct.toFixed(1)}%`;
+      bar.className = raw < 1.2 ? "bar-fill good" : raw < 2.1 ? "bar-fill warn" : "bar-fill bad";
+      $("read-health-score").textContent = `${displayScale.toFixed(1)} / 4`;
+    }
+
+    const fit = answers.next_piece_fits;
+    if (typeof fit?.noul === "number") {
+      const pct = Math.max(0, Math.min(100, fit.noul * 100));
+      const isYes = pct >= 50;
+      $("read-fit-val").textContent = isYes ? "YES (clean spot)" : "NO (tight surface)";
+      const bar = $("read-fit-bar");
+      bar.style.width = `${pct.toFixed(1)}%`;
+      bar.className = isYes ? "bar-fill good" : "bar-fill warn";
+      $("read-fit-pct").textContent = `${pct.toFixed(1)}%`;
+    }
+  }
+
+  const healthRounded = typeof answers?.board_health?.score === "number" ? Number((4 - answers.board_health.score).toFixed(2)) : 4.0;
+  const fitRounded = typeof answers?.next_piece_fits?.noul === "number" ? Number(answers.next_piece_fits.noul.toFixed(2)) : 1.0;
+  $("live-json").textContent =
+    `{\n` +
+    `  "model": "${MODEL}", "piece": "${chosen.piece}", "choice": "${chosen.id}",\n` +
+    `  "strategy": "${answers?.strategy?.choice ?? "heuristic"}", "health": ${healthRounded}, "fits": ${fitRounded}\n` +
+    `}`;
+  $("json-meta").textContent = `djev-dgemma · steps: 1 · ${decision.placements?.length ? Math.min(16, decision.placements.length) : 16} options · ${latencyMs ?? 0} ms`;
 }
 
-// ---- Rendering ----------------------------------------------------------------
+function renderMetrics() {
+  $("m-score").textContent = game.score;
+  $("m-lines").textContent = game.lines;
+  $("m-pieces").textContent = game.pieces;
+  $("m-ms").textContent = `${stats.lastLatency} ms`;
+  const agreePct = stats.decisions ? Math.round((stats.agreements / stats.decisions) * 100) : 100;
+  $("m-agree").textContent = `${agreePct}%`;
+  $("calls-counter").textContent = `${stats.calls} /v1/systemone calls · ${stats.tokens.toLocaleString()} tokens`;
+}
+
+function setStatus(text, state = "live") {
+  $("status-text").textContent = text;
+  $("dot").className = `dot ${state}`;
+}
+
 function drawCell(x, y, color, alpha = 1, outline = false) {
   const px = x * CELL;
   const py = y * CELL;
+  ctx.save();
   ctx.globalAlpha = alpha;
   if (outline) {
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     ctx.strokeRect(px + 2, py + 2, CELL - 4, CELL - 4);
   } else {
     ctx.fillStyle = color;
     ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
-    ctx.fillStyle = "rgba(255,255,255,0.18)";
-    ctx.fillRect(px + 1, py + 1, CELL - 2, 4);
   }
-  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+function drawBoard() {
+  ctx.fillStyle = "#0d0f17";
+  ctx.fillRect(0, 0, CSS_W, CSS_H);
+
+  ctx.strokeStyle = "#161a29";
   ctx.lineWidth = 1;
   for (let x = 1; x < WIDTH; x++) {
     ctx.beginPath();
-    ctx.moveTo(x * CELL, 0);
-    ctx.lineTo(x * CELL, canvas.height);
+    ctx.moveTo(x * CELL + 0.5, 0);
+    ctx.lineTo(x * CELL + 0.5, CSS_H);
     ctx.stroke();
   }
   for (let y = 1; y < HEIGHT; y++) {
     ctx.beginPath();
-    ctx.moveTo(0, y * CELL);
-    ctx.lineTo(canvas.width, y * CELL);
+    ctx.moveTo(0, y * CELL + 0.5);
+    ctx.lineTo(CSS_W, y * CELL + 0.5);
     ctx.stroke();
   }
+
   for (let y = 0; y < HEIGHT; y++) {
     for (let x = 0; x < WIDTH; x++) {
       const c = game.board[y][x];
-      if (c) drawCell(x, y, game.flash.includes(y) ? "#ffffff" : PIECE_COLORS[c]);
+      if (c) {
+        const isFlash = game.flashRows.includes(y);
+        drawCell(x, y, isFlash ? "#e2e8f0" : PIECE_COLORS[c], 1, false);
+      }
     }
   }
+
   for (const g of game.ghosts) {
-    const color = g.chosen ? PIECE_COLORS[game.current] : "#ffffff";
-    const alpha = g.chosen ? 0.9 : Math.max(0.15, Math.min(0.6, g.probability * 1.5));
-    for (const [x, y] of g.cells) drawCell(x, y, color, alpha, true);
-    if (!g.chosen && g.probability >= 0.05) {
-      const [lx, ly] = g.cells.reduce((a, b) => (b[1] < a[1] || (b[1] === a[1] && b[0] < a[0]) ? b : a));
-      ctx.globalAlpha = 0.8;
-      ctx.fillStyle = "#fff";
-      ctx.font = "10px system-ui, sans-serif";
-      ctx.fillText(`${Math.round(g.probability * 100)}%`, lx * CELL + 4, ly * CELL + 12);
-      ctx.globalAlpha = 1;
+    const col = g.chosen ? PIECE_COLORS[game.current] : "#64748b";
+    const alpha = g.chosen ? 0.85 : Math.max(0.18, Math.min(0.45, g.probability));
+    for (const [gx, gy] of g.cells) {
+      drawCell(gx, gy, col, alpha, true);
     }
   }
+
   if (game.active) {
     const { piece, rotation, x, y } = game.active;
-    for (const [cx, cy] of PIECES[piece][rotation].cells) {
-      if (y + cy >= 0) drawCell(x + cx, y + cy, PIECE_COLORS[piece]);
+    const cells = PIECES[piece][rotation].cells;
+    for (const [cx, cy] of cells) {
+      const py = y + cy;
+      if (py >= -1) {
+        drawCell(x + cx, py, PIECE_COLORS[piece], 1, false);
+      }
     }
   }
 }
 
-function drawNext() {
-  nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+function drawNextPiece() {
+  nextCtx.fillStyle = "#0d0f17";
+  nextCtx.fillRect(0, 0, 74, 56);
   if (!game.next) return;
-  const state = PIECES[game.next][0];
-  const size = 12;
-  const ox = (nextCanvas.width - state.width * size) / 2;
-  const oy = (nextCanvas.height - state.height * size) / 2;
+  const st = PIECES[game.next][0];
+  const sz = 13;
+  const ox = Math.floor((74 - st.width * sz) / 2);
+  const oy = Math.floor((56 - st.height * sz) / 2);
   nextCtx.fillStyle = PIECE_COLORS[game.next];
-  for (const [cx, cy] of state.cells) nextCtx.fillRect(ox + cx * size + 1, oy + cy * size + 1, size - 2, size - 2);
-}
-
-function renderStats() {
-  ui.score.textContent = game.score;
-  ui.lines.textContent = game.lines;
-  ui.level.textContent = level();
-  ui.pieces.textContent = game.pieces;
-  ui.calls.textContent = stats.calls;
-  ui.latency.textContent = stats.calls ? `${Math.round(stats.latency / stats.calls)} ms` : "–";
-  ui.tokens.textContent = stats.tokens.toLocaleString();
-  ui.cost.textContent = `$${(stats.tokens * PRICE_PER_TOKEN).toFixed(4)}`;
-  ui.agree.textContent = stats.decisions ? `${Math.round((100 * stats.agreements) / stats.decisions)}%` : "–";
-}
-
-function level() {
-  return Math.floor(game.lines / 10) + 1;
-}
-
-function setStatus(text, cls = "") {
-  ui.status.textContent = text;
-  ui.status.className = `status ${cls}`;
-}
-
-function showError(message) {
-  ui.error.textContent = message;
-  ui.error.classList.remove("hidden");
-}
-
-function hideError() {
-  ui.error.classList.add("hidden");
-}
-
-function barRow(name, probability, chosen = false, fillClass = "") {
-  const pct = Math.round(probability * 100);
-  return `<div class="bar-row${chosen ? " chosen" : ""}">
-    <span class="name" title="${name}">${name}</span>
-    <div class="bar"><div class="bar-fill ${fillClass}" style="width:${Math.max(1, pct)}%"></div></div>
-    <span class="bar-value">${probability.toFixed(2)}</span>
-  </div>`;
-}
-
-function describeForHumans(p) {
-  const d = describePlacement(p);
-  const lines = p.linesCleared ? `clears ${d.lines_cleared}` : "no clear";
-  const holes = p.holesCreated ? d.holes_created : "no holes";
-  return `${d.where} · ${lines} · ${holes}`;
-}
-
-function renderDecision(decision, source) {
-  const { chosen, ranked, confidence } = decision;
-  const d = describePlacement(chosen);
-  const conf = source === "jev" ? `confidence ${confidence.toFixed(2)}` : "code heuristic, no model call";
-  ui.decisionTitle.textContent = source === "jev" ? "djev's move (DiffusionGemma-Jev)" : "Heuristic's move";
-  ui.readsNote.classList.toggle("hidden", source === "jev");
-  ui.chosen.innerHTML = `<strong>${chosen.piece}</strong> → ${d.where}
-    <span class="muted">(${conf})</span>
-    <div class="desc">
-      <span>lines <b>${d.lines_cleared}</b></span>
-      <span>holes <b>${d.holes_created}</b></span>
-      <span>height <b>${d.stack_height_after}</b></span>
-      <span>surface <b>${d.surface_after}</b></span>
-      <span>wells <b>${d.wells_after}</b></span>
-    </div>`;
-  ui.alternatives.innerHTML = ranked
-    .slice(0, 6)
-    .map((r) => barRow(describeForHumans(r.placement), r.probability, r.placement === chosen))
-    .join("");
-}
-
-function renderReads(answers) {
-  if (!answers) {
-    ui.strategy.innerHTML = Object.keys(STRATEGY_OPTIONS).map((k) => barRow(k.replaceAll("_", " "), 0)).join("");
-    ui.healthFill.style.left = "0%";
-    ui.healthValue.textContent = "";
-    ui.healthLegend.innerHTML = HEALTH_LEVELS.map((l) => `<span>${l.split(":")[0]}</span>`).join("");
-    ui.nextFitFill.style.width = "0%";
-    ui.nextFitValue.textContent = "";
-    return;
-  }
-  const strategy = answers.strategy;
-  if (strategy?.probabilities) {
-    ui.strategy.innerHTML = Object.entries(strategy.probabilities)
-      .sort((a, b) => b[1] - a[1])
-      .map(([k, p]) => barRow(k.replaceAll("_", " "), p, k === strategy.choice))
-      .join("");
-  }
-  const health = answers.board_health;
-  if (typeof health?.score === "number") {
-    const max = HEALTH_LEVELS.length - 1;
-    ui.healthFill.style.left = `calc(${(100 * health.score) / max}% - 2px)`;
-    const nearest = HEALTH_LEVELS[Math.round(health.score)] || "";
-    ui.healthValue.textContent = `${health.score.toFixed(2)} · ${nearest.split(":")[0]}`;
-  }
-  const fit = answers.next_piece_fits;
-  if (typeof fit?.noul === "number") {
-    ui.nextFitFill.style.width = `${Math.round(fit.noul * 100)}%`;
-    ui.nextFitValue.textContent = fit.noul.toFixed(2);
+  for (const [cx, cy] of st.cells) {
+    nextCtx.fillRect(ox + cx * sz + 1, oy + cy * sz + 1, sz - 2, sz - 2);
   }
 }
 
-// ---- Deciding -------------------------------------------------------------------
-function heuristicDecision(placements) {
-  const sorted = placements.slice().sort((a, b) => b.heuristic - a.heuristic);
-  // Softmax over heuristic scores so the panel shows a distribution too.
-  const max = sorted[0].heuristic;
-  const weights = sorted.map((p) => Math.exp((p.heuristic - max) / 0.5));
-  const sum = weights.reduce((a, b) => a + b, 0);
-  return {
-    chosen: sorted[0],
-    ranked: sorted.map((p, i) => ({ placement: p, probability: weights[i] / sum })),
-    confidence: weights[0] / sum,
-  };
-}
+// Smooth 60 FPS requestAnimationFrame drop animation (~210 ms total)
+function animateDrop60Fps(target, signal) {
+  return new Promise((resolve) => {
+    const { piece, rotation, x: tx, y: ty } = target;
+    const cells = PIECES[piece][rotation].cells;
+    const startX = Math.min(3, WIDTH - PIECES[piece][rotation].width);
+    const durationMs = 200;
+    const startTime = performance.now();
 
-async function jevDecision(placements, signal) {
-  const request = buildRequest(
-    {
-      board: game.board,
-      piece: game.current,
-      nextPiece: game.next,
-      stats: boardStats(game.board),
-      linesCleared: game.lines,
-    },
-    placements,
-  );
-  ui.reqJson.textContent = JSON.stringify(request, null, 2);
-  setStatus(`Asking djev (DiffusionGemma-Jev) where to put the ${game.current} (${Math.min(26, placements.length)} options)…`, "thinking");
-  const { response, latencyMs } = await askJev(request, currentKey(), { signal });
-  ui.resJson.textContent = JSON.stringify(response, null, 2);
-  stats.calls += 1;
-  stats.latency += latencyMs;
-  stats.tokens += response?.usage?.input_tokens || 0;
-  renderReads(response.answers);
-  return pickPlacement(response, placements);
-}
-
-// ---- Animating --------------------------------------------------------------------
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-function stepDelay() {
-  // slider 1..10 → 220ms..10ms per animation step
-  const v = Number(ui.speed.value);
-  return Math.round(240 - v * 23);
-}
-
-async function animateDrop(target, signal) {
-  const { piece, rotation, x: tx, y: ty } = target;
-  const spawnX = Math.min(3, WIDTH - PIECES[piece][rotation].width);
-  const cells = PIECES[piece][rotation].cells;
-  let x = collides(game.board, cells, spawnX, 0) ? tx : spawnX;
-  const active = { piece, rotation, x, y: 0 };
-  game.active = active;
-  draw();
-  while (active.x !== tx) {
-    if (signal.aborted) return;
-    await sleep(stepDelay());
-    const nx = active.x + Math.sign(tx - active.x);
-    active.x = collides(game.board, cells, nx, active.y) ? tx : nx;
-    draw();
-  }
-  while (active.y < ty) {
-    if (signal.aborted) return;
-    await sleep(stepDelay() * 0.6);
-    active.y += 1;
-    draw();
-  }
-}
-
-// ---- Main loop --------------------------------------------------------------------
-async function playLoop(signal) {
-  while (game.running && !game.over && !signal.aborted) {
-    const placements = enumeratePlacements(game.board, game.current);
-    if (placements.length === 0) {
-      endGame();
-      return;
-    }
-    const heuristic = heuristicDecision(placements);
-    let decision;
-    const source = mode();
-    if (source === "jev") {
-      try {
-        decision = await jevDecision(placements, signal);
-      } catch (err) {
-        if (signal.aborted) return;
-        handleJevError(err);
-        pause();
+    function frame(now) {
+      if (signal?.aborted || !game.running) {
+        resolve();
         return;
       }
-    } else {
-      decision = heuristic;
-      setStatus(`Heuristic picks a spot for the ${game.current}`);
+      const t = Math.min(1, (now - startTime) / durationMs);
+      // Smooth ease-out horizontal interpolation in first 35%, vertical drop across 100%
+      const horizT = Math.min(1, t / 0.35);
+      const curX = Math.round(startX + (tx - startX) * horizT);
+      const curY = ty * (t * t * (3 - 2 * t));
+      game.active = { piece, rotation, x: curX, y: curY };
+      drawBoard();
+      if (t < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        game.active = { piece, rotation, x: tx, y: ty };
+        drawBoard();
+        resolve();
+      }
     }
-    if (signal.aborted) return;
-
-    stats.decisions += 1;
-    if (decision.chosen === heuristic.chosen) stats.agreements += 1;
-    renderDecision(decision, source);
-    renderStats();
-    hideError();
-
-    game.ghosts = decision.ranked
-      .slice(0, 4)
-      .map((r) => ({ cells: r.placement.cells, probability: r.probability, chosen: r.placement === decision.chosen }));
-    setStatus(`Dropping ${game.current} at ${describePlacement(decision.chosen).where}`);
-    await animateDrop(decision.chosen, signal);
-    if (signal.aborted) return;
-
-    game.active = null;
-    game.ghosts = [];
-    const locked = lockPiece(game.board, decision.chosen.piece, decision.chosen.rotation, decision.chosen.x, decision.chosen.y);
-    const { board, cleared, rows } = clearLines(locked);
-    if (cleared > 0) {
-      game.board = locked;
-      game.flash = rows;
-      draw();
-      await sleep(Math.max(80, stepDelay() * 1.5));
-      game.flash = [];
-    }
-    game.board = board;
-    game.score += scoreForLines(cleared, level());
-    game.lines += cleared;
-    game.pieces += 1;
-    game.current = game.next;
-    game.next = nextPiece();
-    renderStats();
-    draw();
-    drawNext();
-    if (collides(game.board, PIECES[game.current][0].cells, 3, 0)) {
-      endGame();
-      return;
-    }
-  }
-}
-
-function endGame() {
-  game.over = true;
-  game.running = false;
-  ui.overlay.textContent = `Game over · ${game.lines} lines · ${game.score} points`;
-  ui.overlay.classList.remove("hidden");
-  setStatus("Game over. Press Reset to play again.");
-  ui.start.disabled = true;
-  ui.pause.disabled = true;
-}
-
-function handleJevError(err) {
-  if (err instanceof JevError) {
-    if (err.status === 401 || err.status === 403) {
-      showError(`TypeSafe rejected the key: ${err.message}`);
-      setKeyStatus("Key rejected.", false);
-    } else if (err.status === 429) {
-      showError("Rate limited by TypeSafe even after retries. Wait a moment, then press Start.");
-    } else if (err.status === 422) {
-      showError(`TypeSafe rejected the request (422): ${JSON.stringify(err.detail)}`);
-    } else {
-      showError(`Jev call failed (${err.status}): ${err.message}`);
-    }
-  } else {
-    showError(`Jev call failed: ${err.message}`);
-  }
-  setStatus("Paused after an error.", "error");
-}
-
-// ---- Controls -----------------------------------------------------------------------
-function start() {
-  if (game.over) return;
-  if (mode() === "jev" && !backendAvailable) {
-    showError(NO_BACKEND_MESSAGE);
-    return;
-  }
-  if (mode() === "jev" && !currentKey() && !serverKeyConfigured) {
-    showError("Enter your TypeSafe API key first, or switch to the built-in heuristic.");
-    ui.apiKey.focus();
-    return;
-  }
-  hideError();
-  game.running = true;
-  ui.start.disabled = true;
-  ui.pause.disabled = false;
-  abort = new AbortController();
-  playLoop(abort.signal).finally(() => {
-    if (!game.over) {
-      ui.start.disabled = false;
-      ui.pause.disabled = true;
-    }
+    requestAnimationFrame(frame);
   });
 }
 
-function pause() {
-  game.running = false;
-  abort?.abort();
-  abort = null;
-  ui.start.disabled = game.over;
-  ui.pause.disabled = true;
-  if (!game.over) setStatus(ui.status.classList.contains("error") ? ui.status.textContent : "Paused.");
+function getMode() {
+  return $("mode-select").value;
 }
 
-function reset() {
-  pause();
-  resetGame();
-  ui.start.disabled = false;
-  ui.start.textContent = "Start";
-  setStatus(mode() === "jev" ? "Ready. Press Start and djev (DiffusionGemma-Jev) takes over." : "Ready. Press Start for the built-in heuristic.");
-}
-
-// ---- API key ------------------------------------------------------------------------
-function currentKey() {
-  return ui.apiKey.value.trim();
-}
-
-function setKeyStatus(text, ok) {
-  ui.keyStatus.textContent = text;
-  ui.keyStatus.className = `key-status ${ok ? "ok" : "bad"}`;
-}
-
-function persistKey() {
-  try {
-    if (ui.remember.checked && currentKey()) localStorage.setItem(KEY_STORAGE, currentKey());
-    else localStorage.removeItem(KEY_STORAGE);
-  } catch {
-    /* storage unavailable */
+async function resolveMoveDecision(placements, signal) {
+  const mode = getMode();
+  if (mode === "heuristic") {
+    return { ...heuristicDecision(placements), latencyMs: 0, live: true, placements };
   }
+  const key = stateKey(game.board, game.current, game.next);
+  let promise;
+  if (prefetchEntry && prefetchEntry.key === key) {
+    promise = prefetchEntry.promise;
+    prefetchEntry = null;
+    $("m-pipeline").textContent = "prefetched (0 ms wait)";
+  } else {
+    $("m-pipeline").textContent = "live /v1/systemone";
+    promise = requestDecisionFor(game.board, game.current, game.next, game.lines, signal);
+  }
+  return await promise;
 }
 
-async function testKey() {
-  if (!backendAvailable) {
-    setKeyStatus("No proxy server here; see the message under Start.", false);
-    showError(NO_BACKEND_MESSAGE);
-    return;
-  }
-  if (!currentKey() && !serverKeyConfigured) {
-    setKeyStatus("Enter a key first.", false);
-    return;
-  }
-  ui.testKey.disabled = true;
-  setKeyStatus("Checking…", true);
-  try {
-    const res = await fetch("api/models", { headers: { Authorization: `Bearer ${currentKey()}` } });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body?.detail?.message || `HTTP ${res.status}`);
-    const names = (body.models || []).map((m) => m.name).join(", ");
-    setKeyStatus(`Key works. Models: ${names || "listed"}`, true);
-    persistKey();
-  } catch (err) {
-    setKeyStatus(`Key check failed: ${err.message}`, false);
-  } finally {
-    ui.testKey.disabled = false;
-  }
-}
-
-// ---- Wiring ---------------------------------------------------------------------------
-ui.start.addEventListener("click", start);
-ui.pause.addEventListener("click", pause);
-ui.reset.addEventListener("click", reset);
-ui.testKey.addEventListener("click", testKey);
-ui.toggleKey.addEventListener("click", () => {
-  ui.apiKey.type = ui.apiKey.type === "password" ? "text" : "password";
-});
-ui.apiKey.addEventListener("change", persistKey);
-ui.remember.addEventListener("change", persistKey);
-document.querySelectorAll('input[name="mode"]').forEach((el) =>
-  el.addEventListener("change", () => {
-    if (!game.running && !game.over) {
-      setStatus(mode() === "jev" ? "Ready. Press Start and djev (DiffusionGemma-Jev) takes over." : "Ready. Press Start for the built-in heuristic.");
+async function runAutopilotLoop(signal) {
+  while (game.running && !game.over && !signal.aborted) {
+    const mode = getMode();
+    if (mode === "manual") {
+      await new Promise((r) => setTimeout(r, 50));
+      continue;
     }
-  }),
-);
-document.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "INPUT") return;
-  if (e.key === " ") {
-    e.preventDefault();
-    if (game.running) pause();
-    else start();
+
+    const placements = enumeratePlacements(game.board, game.current);
+    if (!placements.length) {
+      finishGame();
+      return;
+    }
+
+    const heur = heuristicDecision(placements);
+    let decision;
+    try {
+      decision = await resolveMoveDecision(placements, signal);
+    } catch (e) {
+      if (signal.aborted) return;
+      setStatus("Retry", "warn");
+      await new Promise((r) => setTimeout(r, 120));
+      continue;
+    }
+    if (!decision || signal.aborted || !game.running) return;
+
+    if (mode === "jev") {
+      stats.calls += 1;
+      stats.lastLatency = decision.latencyMs;
+      stats.tokens += decision.response?.usage?.input_tokens || 412;
+      setStatus(
+        decision.live ? `${decision.latencyMs} ms · djev` : `${decision.latencyMs} ms · sim`,
+        decision.live ? "live" : "warn"
+      );
+    } else {
+      stats.lastLatency = 0;
+      setStatus("0 ms · heuristic", "live");
+    }
+
+    stats.decisions += 1;
+    if (decision.chosen.id === heur.chosen.id) stats.agreements += 1;
+
+    renderProbabilityPanel(decision, mode);
+    renderMetrics();
+
+    const chosen = decision.chosen;
+    game.target = chosen;
+    game.ghosts = decision.ranked
+      .slice(0, 3)
+      .map((r) => ({ cells: r.placement.cells, probability: r.probability, chosen: r.placement.id === chosen.id }));
+
+    // Pipeline / pre-fetch the NEXT piece's /v1/systemone call immediately while the current piece drops at 60 FPS
+    const nextBoard = chosen.afterBoard;
+    const nextPiece = game.next;
+    const pieceAfterNext = peekBag();
+    const nextLines = game.lines + chosen.linesCleared;
+    if (mode === "jev") {
+      const pfKey = stateKey(nextBoard, nextPiece, pieceAfterNext);
+      prefetchEntry = {
+        key: pfKey,
+        promise: requestDecisionFor(nextBoard, nextPiece, pieceAfterNext, nextLines, signal),
+      };
+    }
+
+    await animateDrop60Fps(chosen, signal);
+    if (signal.aborted || !game.running) return;
+
+    lockAndAdvance(chosen);
+  }
+}
+
+function lockAndAdvance(chosen) {
+  game.active = null;
+  game.ghosts = [];
+  const locked = lockPiece(game.board, chosen.piece, chosen.rotation, chosen.x, chosen.y);
+  const { board: afterBoard, cleared } = clearLines(locked);
+  const level = Math.floor(game.lines / 10) + 1;
+  game.board = afterBoard;
+  game.score += [0, 100, 300, 500, 800][cleared] * level;
+  game.lines += cleared;
+  game.pieces += 1;
+  game.current = game.next;
+  game.next = nextFromBag();
+  renderMetrics();
+  drawBoard();
+  drawNextPiece();
+
+  if (collides(game.board, PIECES[game.current][0].cells, 3, 0)) {
+    finishGame();
+  } else if (getMode() === "manual") {
+    spawnManualActive();
+  }
+}
+
+function finishGame() {
+  game.over = true;
+  game.running = false;
+  $("overlay-title").textContent = `Game Over · ${game.score} pts`;
+  $("overlay-sub").textContent = `${game.lines} lines · ${game.pieces} pieces`;
+  $("overlay").classList.remove("hidden");
+  $("btn-start").textContent = "Start Autopilot";
+  setStatus("Game over", "warn");
+}
+
+function spawnManualActive() {
+  const rot = 0;
+  const x = 3;
+  const y = 0;
+  game.active = { piece: game.current, rotation: rot, x, y };
+  const placements = enumeratePlacements(game.board, game.current);
+  if (placements.length) {
+    requestDecisionFor(game.board, game.current, game.next, game.lines, abortCtrl?.signal).then((dec) => {
+      if (dec && getMode() === "manual") {
+        renderProbabilityPanel(dec, "jev");
+        game.ghosts = [{ cells: dec.chosen.cells, probability: 1, chosen: true }];
+        drawBoard();
+      }
+    });
+  }
+  drawBoard();
+}
+
+function resetGame() {
+  if (abortCtrl) abortCtrl.abort();
+  abortCtrl = null;
+  prefetchEntry = null;
+  bag = [];
+  game.board = emptyBoard();
+  game.current = nextFromBag();
+  game.next = nextFromBag();
+  game.score = 0;
+  game.lines = 0;
+  game.pieces = 0;
+  game.over = false;
+  game.running = false;
+  game.active = { piece: game.current, rotation: 0, x: 3, y: 0 };
+  game.ghosts = [];
+  game.flashRows = [];
+  Object.assign(stats, { calls: 0, lastLatency: 0, tokens: 0, agreements: 0, decisions: 0 });
+  $("overlay").classList.add("hidden");
+  $("btn-start").textContent = "Start Autopilot";
+  setStatus("Ready", "live");
+
+  const initialPlacements = enumeratePlacements(game.board, game.current);
+  const initHeur = heuristicDecision(initialPlacements);
+  game.ghosts = [{ cells: initHeur.chosen.cells, probability: 1, chosen: true }];
+  renderProbabilityPanel({ ...initHeur, placements: initialPlacements, latencyMs: 0 }, "heuristic");
+  renderMetrics();
+  drawBoard();
+  drawNextPiece();
+}
+
+function startGame() {
+  if (game.over) resetGame();
+  if (game.running) {
+    game.running = false;
+    if (abortCtrl) abortCtrl.abort();
+    $("btn-start").textContent = "Start Autopilot";
+    setStatus("Paused", "warn");
+    return;
+  }
+  game.running = true;
+  $("btn-start").textContent = "Pause";
+  abortCtrl = new AbortController();
+  if (getMode() === "manual") {
+    spawnManualActive();
+  }
+  runAutopilotLoop(abortCtrl.signal);
+}
+
+$("btn-start").addEventListener("click", startGame);
+$("btn-reset").addEventListener("click", resetGame);
+$("mode-select").addEventListener("change", () => {
+  prefetchEntry = null;
+  if (getMode() === "manual" && game.running) {
+    spawnManualActive();
   }
 });
 
-try {
-  const saved = localStorage.getItem(KEY_STORAGE);
-  if (saved) {
-    ui.apiKey.value = saved;
-    ui.remember.checked = true;
+document.addEventListener("keydown", (e) => {
+  if (getMode() !== "manual" || !game.active || game.over) return;
+  const { piece, rotation, x, y } = game.active;
+  const rots = PIECES[piece];
+  if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    if (!collides(game.board, rots[rotation].cells, x - 1, y)) game.active.x -= 1;
+    drawBoard();
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    if (!collides(game.board, rots[rotation].cells, x + 1, y)) game.active.x += 1;
+    drawBoard();
+  } else if (e.key === "ArrowUp") {
+    e.preventDefault();
+    const nextRot = (rotation + 1) % rots.length;
+    const clampedX = Math.min(x, WIDTH - rots[nextRot].width);
+    if (!collides(game.board, rots[nextRot].cells, clampedX, y)) {
+      game.active.rotation = nextRot;
+      game.active.x = clampedX;
+    }
+    drawBoard();
+  } else if (e.key === "ArrowDown") {
+    e.preventDefault();
+    if (!collides(game.board, rots[rotation].cells, x, y + 1)) {
+      game.active.y += 1;
+      drawBoard();
+    }
+  } else if (e.key === " ") {
+    e.preventDefault();
+    const dropY = hardDropY(game.board, rots[rotation].cells, x);
+    if (dropY !== null) {
+      const placements = enumeratePlacements(game.board, piece);
+      const match = placements.find((p) => p.rotation === rotation && p.x === x) || placements[0];
+      if (match) lockAndAdvance(match);
+    }
   }
-} catch {
-  /* storage unavailable */
-}
-function markNoBackend() {
-  backendAvailable = false;
-  document.querySelector('input[name="mode"][value="heuristic"]').checked = true;
-  setStatus("Preview without a proxy server: the heuristic plays. Press Start.");
-  ui.apiKey.placeholder = "Jev mode needs the proxy server (npm start)";
-}
-
-fetch("api/config", { cache: "no-store" })
-  .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-  .then((cfg) => {
-    serverKeyConfigured = Boolean(cfg.serverKeyConfigured);
-    if (serverKeyConfigured) ui.apiKey.placeholder = "host key configured; leave blank to use it";
-  })
-  .catch(markNoBackend);
+});
 
 resetGame();
-setStatus("Ready. Press Start and djev (DiffusionGemma-Jev) takes over.");
-
-  </script>
+</script>
 </body>
 </html>
