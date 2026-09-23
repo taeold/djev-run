@@ -63,24 +63,30 @@ gcloud beta run deploy djev-dgemma \
 # DISABLE_MM=1: skips SigLIP vision/video encoder profiling for text-only evaluation
 ```
 
-### Step 3: Play the Built-in Snake Demo (Zero Dependencies)
+### Step 3: Play the Built-in Snake and Chrome Dino Demos (Zero Dependencies)
 
-`snake.html` is a standalone HTML file with zero dependencies (no Node.js,
-`npm`, or AI SDK required). It calls `POST /v1/systemone` directly from the
-browser via `fetch()` at ~15 moves/sec:
+`snake.html` (`/snake`) and `dino.html` (`/dino`) are standalone HTML files with
+zero external dependencies. They call `POST /v1/systemone` directly from the
+browser via `fetch()`:
 
--   **Hosted on Cloud Run**: Open `https://<your-cloud-run-url>/snake` in your
-    browser.
--   **Local file**: Open `snake.html` directly in a browser and set
-    `CLOUD_RUN_URL` at the top of `<script>`.
+-   **Snake Arena**: Open `https://<your-cloud-run-url>/snake` in your browser.
+-   **Chrome T-Rex Dino Arena**: Open `https://<your-cloud-run-url>/dino` in
+    your browser (`unassisted` raw `/v1/systemone` mode and `model + live shield`
+    mode, 2x HiDPI Chromium sprites, exact two-stage pixel-box collision checks,
+    and 60 FPS Web Worker physics loop).
+-   **Extractive Spans (`span` / `spans`) & Constrained Readout**: Built on
+    [`mmastrac/djev`](https://github.com/mmastrac/djev) (`span-answer-type`) and
+    [`vllm-project/vllm#58216`](https://github.com/vllm-project/vllm/pull/58216)
+    (`diffusion_constrained` + `diffusion_pinned`).
 
 --------------------------------------------------------------------------------
 
 ## Use with Vercel AI SDK (Optional)
 
-Because `djev-spark` implements the `/v1/systemone` endpoint contract, you can
-also point `@ai-sdk/typesafe-ai` at your Cloud Run URL from Node.js or
-TypeScript (`index.ts`):
+Because `djev-run` implements the `/v1/systemone` endpoint contract (`noul` /
+`boolean`, `choice`, `score`, `span`, and `spans`), you can also point
+`@ai-sdk/typesafe-ai` at your Cloud Run URL from Node.js or TypeScript
+(`index.ts`):
 
 ```typescript
 import { createTypeSafeAi } from '@ai-sdk/typesafe-ai';
@@ -121,22 +127,6 @@ const result = await triage(
   'I was charged twice and my account is locked',
 );
 console.log(result);
-// {
-//   department: {
-//     type: 'choice',
-//     choice: 'billing',
-//     probabilities: { billing: 0.9988, support: 0.0012 }
-//   },
-//   severity: {
-//     type: 'score',
-//     score: 1.9995,
-//     probabilities: { '0': 0.0002, '1': 0.0001, '2': 0.9997 }
-//   },
-//   requestsRefund: {
-//     type: 'boolean',
-//     probability: 0.9928
-//   }
-// }
 ```
 
 ```bash
@@ -146,24 +136,22 @@ CLOUD_RUN_URL="https://<your-cloud-run-url>" TYPESAFE_AI_API_KEY="$(gcloud auth 
 
 --------------------------------------------------------------------------------
 
-## Performance
+## Performance & JevBench v1.3.0 (`N = 231`)
 
--   **Cold start from zero instances**: **~47.5s** (down from `4m 05s` baseline)
--   **Single-request latency**: **~35-60 ms** (`steps=1, samples=1`; **~160 ms**
-    with `samples="auto"`)
--   **Batch throughput**: **~100-123 requests/sec** at `concurrency=32`
-
-To reach a 47.5-second cold start on Cloud Run, the container streams the 17.5 GB
-`safetensors` weights from GCS into `/dev/shm` RAM in the background (`1.05
-GiB/s`) while Python imports `torch` and `vllm`, forks `EngineCore` from
-`APIServer` (`VLLM_WORKER_MULTIPROC_METHOD=fork`) so modules are not imported
-twice, disables unused SigLIP vision profiling (`DISABLE_MM=1`), and skips
-`torch.compile`, CUDA graph capture, and redundant memory-profiling passes
-(`ENFORCE_EAGER=1`, `TORCH_COMPILE_DISABLE=1`, `--kv-cache-memory`).
-
-Empirical benchmarks on Cloud Run with the RTX PRO 6000 confirmed:
-- Streaming over VPC egress from GCS FUSE into `/dev/shm` (~47.5s) outperforms baking weights into the container image (80-115s), avoiding heavy overlay filesystem read overhead and long image import operations.
-- `--cpu-boost` is omitted because host CPU frequency scaling under boosted allocation slows down 20 vCPU container initialization on GPU nodes (73-75s vs 47.5s).
+-   **Cold start from zero instances**: **29.7s** (`VLLM_ENABLE_V1_MULTIPROCESSING=0`
+    in-process vLLM engine + 32-worker parallel rootfs prefetch + 2-shard
+    background `/dev/shm` streaming, down from `4m 05s` baseline)
+-   **Single-request latency**: **~61 ms server / ~116 ms WAN RTT** (`steps=1, samples=1`;
+    **~121 ms p50 WAN RTT** with `samples="auto"`)
+-   **JevBench v1.3.0 (`N = 231` public suite, `diffusion_constrained=True`)**:
+    -   **Fast Mode (`steps=1, samples=1`)**: **81.39% Overall Accuracy**
+        (**100.00% Easy**, **95.83% Standard**, **63.96% Hard**), **0.2739 Mean
+        Brier**, **0.0963 ECE**, **80.74 Calibration Score**, **79.29
+        Intelligence Score**, **77.34 Composite Score**.
+    -   **Auto Mode (`steps=1, samples="auto"`)**: **81.82% Overall Accuracy**
+        (**100.00% Easy**, **95.83% Standard**, **64.86% Hard**), **0.2687 Mean
+        Brier**, **0.0989 ECE**, **80.22 Calibration Score**, **79.70
+        Intelligence Score**, **77.01 Composite Score**.
 
 --------------------------------------------------------------------------------
 

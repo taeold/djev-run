@@ -7,6 +7,8 @@ on:
     paths:
       - '.github/workflows/docker.yml'
       - 'snake.html'
+      - 'dino.html'
+      - 'ultra_fast_entrypoint.sh'
 
 permissions:
   contents: read
@@ -24,123 +26,180 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
 
-      - name: Clone mmastrac/djev-spark and adapt for Cloud Run
+      - name: Clone mmastrac/djev-spark, mmastrac/djev (span-answer-type), and vLLM PR #58216 overlay
         run: |
           git clone --depth=1 https://github.com/mmastrac/djev-spark.git djev-spark
+          git clone https://github.com/mmastrac/djev.git mmastrac-djev
+          git -C mmastrac-djev checkout 11cb7c87b0b92a89e22f1e51002733bbf906b159
+          cp mmastrac-djev/structured_server.py djev-spark/server/structured_server.py
           cp snake.html djev-spark/server/snake.html
-          python3 -c '
+          cp dino.html djev-spark/server/dino.html
+          cp ultra_fast_entrypoint.sh djev-spark/entrypoint.sh
+          cat > patch_server.py << 'EOF'
           import pathlib
           p = pathlib.Path("djev-spark/server/structured_server.py")
           s = p.read_text()
           s = s.replace(
-              "TEST_PAGE = os.environ.get(\"TEST_PAGE\", \"\") == \"1\"",
-              "TEST_PAGE = True"
+              "TOK = None",
+              "TOK = None\n"
+              "TEST_PAGE = os.environ.get(\"TEST_PAGE\", \"\") == \"1\"\n"
+              "PAGES = {\n"
+              "    \"/\": \"snake.html\",\n"
+              "    \"/snake\": \"snake.html\",\n"
+              "    \"/snake.html\": \"snake.html\",\n"
+              "    \"/dino\": \"dino.html\",\n"
+              "    \"/dino.html\": \"dino.html\",\n"
+              "    \"/playground\": \"playground.html\",\n"
+              "    \"/playground.html\": \"playground.html\",\n"
+              "    \"/walk\": \"walk.html\",\n"
+              "    \"/cube\": \"cube.html\",\n"
+              "}",
+              1,
           )
           s = s.replace(
-              "\"/\": \"playground.html\",",
-              "\"/\": \"snake.html\",\n    \"/snake\": \"snake.html\",\n    \"/snake.html\": \"snake.html\","
+              "def pin_xargs(template, slots, steps):",
+              "def constrained_xargs():\n"
+              "    \"\"\"Read over the labels only (vLLM PR #58216).\"\"\"\n"
+              "    return {\"diffusion_constrained\": True} if getattr(ARGS, \"constrained\", True) else {}\n\n\n"
+              "def pin_xargs(template, slots, steps):",
+          )
+          s = s.replace(
+              "**pin_xargs(template, slots, schema[\"steps\"]),",
+              "**pin_xargs(template, slots, schema[\"steps\"]),\n            **constrained_xargs(),",
+          )
+          s = s.replace(
+              "class Handler(BaseHTTPRequestHandler):",
+              "class Server(ThreadingHTTPServer):\n"
+              "    request_queue_size = 256\n"
+              "    daemon_threads = True\n\n\n"
+              "class Handler(BaseHTTPRequestHandler):",
           )
           s = s.replace(
               "        if self.path == \"/health\":\n            return self._json(200, {\"status\": \"ok\"})",
               "        if self.path == \"/health\":\n"
-              "            try:\n"
-              "                urllib.request.urlopen(ARGS.upstream + \"/health\", timeout=1)\n"
-              "                return self._json(200, {\"status\": \"ok\"})\n"
-              "            except Exception:\n"
-              "                return self._json(503, {\"status\": \"starting\"})"
+              "            return self._json(200, {\"status\": \"ok\"})\n"
+              "        path_clean = self.path.split(\"?\")[0]\n"
+              "        if path_clean in PAGES and TEST_PAGE:\n"
+              "            target_file = os.path.join(\n"
+              "                os.path.dirname(os.path.abspath(__file__)), PAGES[path_clean]\n"
+              "            )\n"
+              "            if os.path.exists(target_file):\n"
+              "                body = open(target_file, \"rb\").read()\n"
+              "                self.send_response(200)\n"
+              "                self.send_header(\"content-type\", \"text/html; charset=utf-8\")\n"
+              "                self.send_header(\"content-length\", str(len(body)))\n"
+              "                self.end_headers()\n"
+              "                self.wfile.write(body)\n"
+              "                return",
           )
           s = s.replace(
-              "init_tokenizer(AutoTokenizer.from_pretrained(ARGS.tokenizer))",
-              "tok = AutoTokenizer.from_pretrained(ARGS.tokenizer)\n"
-              "    if tok.chat_template is None and os.path.exists(os.path.join(ARGS.tokenizer, \"chat_template.jinja\")):\n"
-              "        tok.chat_template = open(os.path.join(ARGS.tokenizer, \"chat_template.jinja\")).read()\n"
-              "    init_tokenizer(tok)"
-          )
-          p.write_text(s)
-          '
-          cat > djev-spark/patch_vllm.py << 'EOF'
-          import pathlib
-
-          p = pathlib.Path("/usr/local/lib/python3.12/dist-packages/vllm/v1/worker/gpu_worker.py")
-          s = p.read_text()
-          s = s.replace(
-              "        if kv_cache_memory_bytes := self.cache_config.kv_cache_memory_bytes:\n"
-              "            # still need a profile run which compiles the model for\n"
-              "            # max_num_batched_tokens\n"
-              "            self.model_runner.profile_run()",
-              "        if kv_cache_memory_bytes := self.cache_config.kv_cache_memory_bytes:\n"
-              "            if not self.model_config.enforce_eager:\n"
-              "                self.model_runner.profile_run()"
+              "    p.add_argument(\"--host\", default=\"0.0.0.0\")",
+              "    p.add_argument(\n"
+              "        \"--no-constrained\",\n"
+              "        dest=\"constrained\",\n"
+              "        action=\"store_false\",\n"
+              "        help=\"read over the whole vocabulary instead of the labels\",\n"
+              "    )\n"
+              "    p.add_argument(\"--host\", default=\"0.0.0.0\")",
           )
           s = s.replace(
-              "        kernel_warmup(self)\n\n"
-              "        if self.use_v2_model_runner:\n"
-              "            # A workspace resize after capture frees what the graphs point at.\n"
-              "            warmup_kernels(self.model_runner, self.execute_model, self.sample_tokens)",
-              "        if not self.model_config.enforce_eager:\n"
-              "            kernel_warmup(self)\n"
-              "            if self.use_v2_model_runner:\n"
-              "                warmup_kernels(self.model_runner, self.execute_model, self.sample_tokens)"
-          )
-          s = s.replace(
-              "self.model_runner.load_model(load_dummy_weights=load_dummy_weights)",
-              "import os, time\n"
-              "            while os.path.exists('/dev/shm/dgemma') and not os.path.exists('/dev/shm/dgemma/.ready'): time.sleep(0.05)\n"
-              "            self.model_runner.load_model(load_dummy_weights=load_dummy_weights)"
+              "ThreadingHTTPServer((host, port), Handler)", "Server((host, port), Handler)"
+          ).replace(
+              "ThreadingHTTPServer((ARGS.host, ARGS.port), Handler)",
+              "Server((ARGS.host, ARGS.port), Handler)",
           )
           p.write_text(s)
           EOF
-          cat > djev-spark/entrypoint.sh << 'EOF'
-          #!/usr/bin/env bash
-          set -euo pipefail
-          MODEL="${MODEL:-/mnt/gcs/dgemma}"
-          CANVAS="${CANVAS:-128}"
-          PORT="${PORT:-8080}"
-          ENFORCE_EAGER="${ENFORCE_EAGER:-1}"
-          DISABLE_MM="${DISABLE_MM:-1}"
-          export VLLM_WORKER_MULTIPROC_METHOD="${VLLM_WORKER_MULTIPROC_METHOD:-fork}"
-          EXTRA_ARGS="${EXTRA_ARGS:-}"
-          JIT_CACHE_ARCHIVE="/mnt/gcs/jit-cache/rtx-pro-6000-cache.tar.gz"
-          mkdir -p /root/.cache/flashinfer /root/.triton /root/.cache/vllm
-          if [ -f "$JIT_CACHE_ARCHIVE" ]; then
-            tar -xzf "$JIT_CACHE_ARCHIVE" -C /root/ || true
-          fi
-          if [ "${COPY_TO_SHM:-1}" = "1" ] && [ -d "/mnt/gcs/dgemma" ] && [ -f "/mnt/gcs/dgemma/config.json" ]; then
-            mkdir -p /dev/shm/dgemma
-            find /mnt/gcs/dgemma -maxdepth 1 -type f ! -name "*.safetensors" | xargs -I {} cp -f {} /dev/shm/dgemma/
-            (
-              find /mnt/gcs/dgemma -maxdepth 1 -type f -name "*.safetensors" | xargs -P 16 -I {} cp -f {} /dev/shm/dgemma/
-              touch /dev/shm/dgemma/.ready
-              echo "[init] Background safetensors copy to /dev/shm/dgemma complete"
-            ) &
-            MODEL="/dev/shm/dgemma"
-          fi
-          python3 /opt/dgemma/structured_server.py --upstream http://127.0.0.1:8000 --model dgemma --tokenizer "$MODEL" --canvas "$CANVAS" --host 0.0.0.0 --port "$PORT" &
-          VLLM_EXTRA_ARGS=()
-          if [ "$ENFORCE_EAGER" = "1" ]; then
-            export TORCH_COMPILE_DISABLE="${TORCH_COMPILE_DISABLE:-1}"
-            VLLM_EXTRA_ARGS+=(--enforce-eager --kernel-config '{"enable_flashinfer_autotune":false,"enable_cutedsl_warmup":false,"enable_jit_warmup":false}')
-          fi
-          if [ "$DISABLE_MM" = "1" ]; then
-            VLLM_EXTRA_ARGS+=(--language-model-only --skip-mm-profiling --limit-mm-per-prompt '{"image":0,"video":0}')
-          fi
-          if [ -n "$EXTRA_ARGS" ]; then
-            VLLM_EXTRA_ARGS+=($EXTRA_ARGS)
-          fi
-          exec vllm serve "$MODEL" --host 127.0.0.1 --port 8000 --served-model-name dgemma --trust-remote-code \
-            --max-num-seqs "${MAX_SEQS:-32}" --max-model-len "${MAX_MODEL_LEN:-4096}" \
-            --attention-backend "${ATTN:-TRITON_ATTN}" --gpu-memory-utilization "${GPU_UTIL:-0.40}" \
-            --kv-cache-memory "$(( ${KV_CACHE_GB:-2} * 1073741824 ))" --max-logprobs 32 --enable-prefix-caching \
-            --diffusion-config "{\"canvas_length\": ${CANVAS}}" --override-generation-config '{"max_new_tokens": null}' \
-            --async-scheduling "${VLLM_EXTRA_ARGS[@]}"
+          python3 patch_server.py
+          cat > djev-spark/patch_vllm.py << 'EOF'
+          import pathlib, shutil, urllib.request
+
+          VLLM_6591 = "6591b093b29536dd070c6af3628b734025c53e23"
+          VLLM_F831 = "f831226339b87554b1de9341276e7bee7270fa8a"
+          dg_6591 = urllib.request.urlopen(f"https://raw.githubusercontent.com/mmastrac/vllm/{VLLM_6591}/vllm/model_executor/models/diffusion_gemma.py").read().decode("utf-8")
+          dg_f831 = urllib.request.urlopen(f"https://raw.githubusercontent.com/mmastrac/vllm/{VLLM_F831}/vllm/model_executor/models/diffusion_gemma.py").read().decode("utf-8")
+          split_anchor = "@torch.compile(dynamic=True, backend=current_platform.simple_compile_backend)\ndef _compute_num_rejected("
+          dg_head = dg_6591.split(split_anchor, 1)[0].replace("import torch\n", "import torch\nimport torch._dynamo\n", 1)
+          old_cl = """    def compute_logits(self, hidden_states: torch.Tensor) -> torch.Tensor | None:
+                  logits = self.logits_processor(self.lm_head, hidden_states)
+                  if logits is not None and self.final_logit_softcapping is not None:
+                      logits = _softcap_logits(logits, self.final_logit_softcapping)
+                  return logits"""
+          new_cl = """    def compute_logits(self, hidden_states: torch.Tensor) -> torch.Tensor | None:
+                  states = getattr(self, "diffusion_states", None)
+                  allowed = states.step_allowed if states is not None else None
+                  if allowed is not None:
+                      logits = torch.nn.functional.linear(
+                          hidden_states, self.lm_head.weight[allowed]
+                      ).float()
+                      if self.final_logit_softcapping is not None:
+                          logits = _softcap_logits(logits, self.final_logit_softcapping)
+                      return logits
+                  logits = self.logits_processor(self.lm_head, hidden_states)
+                  if logits is not None and self.final_logit_softcapping is not None:
+                      logits = _softcap_logits(logits, self.final_logit_softcapping)
+                  return logits"""
+          dg_head = dg_head.replace(old_cl, new_cl, 1)
+          dg_tail = split_anchor + dg_f831.split(split_anchor, 1)[1]
+          old_remove = """    def remove_request(self, req_id: str) -> None:
+                  idx = self._req_id_to_index.pop(req_id, None)
+                  if idx is not None:
+                      self.diffusion_states.remove_request(idx)"""
+          new_remove = old_remove + """\n\n    def num_draft_tokens_per_req(self, input_batch: Any) -> np.ndarray:\n        slots = input_batch.idx_mapping_np[: input_batch.num_reqs]\n        return self.diffusion_states.canvas_width_np[slots]"""
+          dg_tail = dg_tail.replace(old_remove, new_remove, 1)
+          dg_tail = dg_tail.replace(
+              "    def add_request(self, req_idx: int, sampling_params: Any) -> None:",
+              "    def add_request(self, req_idx: int, prompt_len: Any, sampling_params: Any = None) -> None:\n        if sampling_params is None:\n            sampling_params = prompt_len",
+              1,
+          )
+          vllm_root = pathlib.Path("/usr/local/lib/python3.12/dist-packages/vllm")
+          baked_vllm = pathlib.Path("/opt/dgemma/v9_baked/vllm")
+          (vllm_root / "model_executor/models/diffusion_gemma.py").write_text(dg_head + dg_tail)
+          for rel in ("utils/diffusion.py", "v1/core/sched/diffusion_scheduler.py"):
+              urllib.request.urlretrieve(f"https://raw.githubusercontent.com/mmastrac/vllm/{VLLM_F831}/vllm/{rel}", vllm_root / rel)
+          for rel in ("model_executor/models/diffusion_gemma.py", "utils/diffusion.py", "v1/core/sched/diffusion_scheduler.py"):
+              dest = baked_vllm / rel
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(vllm_root / rel, dest)
+
+          p = vllm_root / "v1/worker/gpu_worker.py"
+          s = p.read_text()
+          if "while os.path.exists('/dev/shm/dgemma')" not in s:
+              s = s.replace(
+                  "        if kv_cache_memory_bytes := self.cache_config.kv_cache_memory_bytes:\n"
+                  "            # still need a profile run which compiles the model for\n"
+                  "            # max_num_batched_tokens\n"
+                  "            self.model_runner.profile_run()",
+                  "        if kv_cache_memory_bytes := self.cache_config.kv_cache_memory_bytes:\n"
+                  "            if not self.model_config.enforce_eager:\n"
+                  "                self.model_runner.profile_run()"
+              )
+              s = s.replace(
+                  "        kernel_warmup(self)\n\n"
+                  "        if self.use_v2_model_runner:\n"
+                  "            # A workspace resize after capture frees what the graphs point at.\n"
+                  "            warmup_kernels(self.model_runner, self.execute_model, self.sample_tokens)",
+                  "        if not self.model_config.enforce_eager:\n"
+                  "            kernel_warmup(self)\n"
+                  "            if self.use_v2_model_runner:\n"
+                  "                warmup_kernels(self.model_runner, self.execute_model, self.sample_tokens)"
+              )
+              s = s.replace(
+                  "self.model_runner.load_model(load_dummy_weights=load_dummy_weights)",
+                  "import os, time\n"
+                  "            while os.path.exists('/dev/shm/dgemma') and not os.path.exists('/dev/shm/dgemma/.ready'): time.sleep(0.02)\n"
+                  "            self.model_runner.load_model(load_dummy_weights=load_dummy_weights)"
+              )
+              p.write_text(s)
           EOF
           cat > djev-spark/Dockerfile.cloudrun << 'EOF'
           FROM ghcr.io/taeold/djev-run:latest
           COPY patch_vllm.py /tmp/patch_vllm.py
           RUN python3 /tmp/patch_vllm.py && rm /tmp/patch_vllm.py
-          COPY server/structured_server.py server/snake.html server/playground.html server/walk.html server/cube.html server/test_structured_server.py /opt/dgemma/
+          COPY server/structured_server.py server/snake.html server/dino.html server/playground.html server/walk.html server/cube.html server/test_structured_server.py /opt/dgemma/
+          COPY server/structured_server.py server/snake.html server/dino.html /opt/dgemma/v9_baked/dgemma/
           COPY entrypoint.sh /entrypoint.sh
-          RUN chmod +x /entrypoint.sh && python3 -m py_compile /opt/dgemma/structured_server.py
+          RUN chmod +x /entrypoint.sh && python3 -m compileall -f -q /opt/dgemma/structured_server.py /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/diffusion_gemma.py /usr/local/lib/python3.12/dist-packages/vllm/utils/diffusion.py /usr/local/lib/python3.12/dist-packages/vllm/v1/core/sched/diffusion_scheduler.py
           EXPOSE 8080
           ENTRYPOINT ["/entrypoint.sh"]
           EOF

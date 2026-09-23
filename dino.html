@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LAYA vs JEV / DINO ARENA · Cloud Run djev-dgemma</title>
+  <style>
+    :root {
+      --page: #ffffff;
+      --ink: #202124;
+      --text: #5f6368;
+      --faint: #9aa0a6;
+      --rule: #e2e4e8;
+      --track: #f1f3f4;
+      --warn: #c5221f;
+      --jev: #eb6834;
+      --laya: #2a78d6;
+      --green: #188038;
+      --mono: "SF Mono", "Menlo", "Monaco", "Consolas", ui-monospace, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--page);
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.45;
+      padding: 24px 36px;
+      max-width: 1380px;
+      margin: 0 auto;
+    }
+    .arena-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--rule);
+      margin-bottom: 14px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .arena-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+    }
+    .arena-subtitle {
+      font-size: 13px;
+      color: var(--text);
+      margin-top: 3px;
+    }
+    .arena-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--rule);
+      margin-bottom: 18px;
+    }
+    button, select, input[type="text"] {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink);
+      background: var(--track);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 5px 10px;
+      height: 30px;
+    }
+    button {
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.primary {
+      background: var(--jev);
+      color: #ffffff;
+      border-color: var(--jev);
+    }
+    button:hover {
+      border-color: var(--ink);
+    }
+    label.ctrl-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text);
+    }
+    .player-header {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .player-chip {
+      width: 13px;
+      height: 13px;
+      border-radius: 2px;
+      background: var(--jev);
+      display: inline-block;
+      transform: translateY(1px);
+    }
+    .player-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .player-detail {
+      font-size: 12px;
+      color: var(--text);
+    }
+    .pipeline-line {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--jev);
+      margin-bottom: 8px;
+      letter-spacing: 0.01em;
+    }
+    .main-row {
+      display: grid;
+      grid-template-columns: 720px 1fr;
+      gap: 28px;
+      align-items: start;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 1120px) {
+      .main-row { grid-template-columns: 1fr; }
+    }
+    .game-frame {
+      position: relative;
+      border: 1px solid var(--rule);
+      background: #ffffff;
+      width: 100%;
+      max-width: 720px;
+    }
+    canvas#dinoCanvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 4 / 1;
+      background: #ffffff;
+    }
+    .event-badge {
+      position: absolute;
+      left: 12px;
+      bottom: 10px;
+      background: #ffffff;
+      border: 1px solid var(--jev);
+      border-radius: 5px;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink);
+      display: none;
+      pointer-events: none;
+    }
+    .event-badge.warn {
+      border-color: var(--warn);
+      color: var(--warn);
+      background: #fff8f7;
+    }
+    .panel-heading {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--faint);
+      letter-spacing: 0.04em;
+      margin-bottom: 10px;
+    }
+    .prob-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .prob-item {
+      display: grid;
+      grid-template-columns: 78px 1fr 48px 68px;
+      align-items: center;
+      gap: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+    .prob-key {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .prob-item.chosen .prob-key {
+      color: var(--ink);
+    }
+    .prob-track {
+      height: 12px;
+      background: var(--track);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .prob-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--faint);
+      border-radius: 3px;
+      transition: width 55ms linear;
+    }
+    .prob-item.chosen .prob-fill {
+      background: var(--jev);
+    }
+    .prob-pct {
+      text-align: right;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .prob-item.chosen .prob-pct {
+      color: var(--ink);
+      font-weight: 700;
+    }
+    .prob-tag {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--faint);
+    }
+    .prob-tag.warn { color: var(--warn); }
+    .prob-tag.best { color: var(--green); }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    .kpi-tile {
+      display: flex;
+      flex-direction: column;
+    }
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--faint);
+      letter-spacing: 0.03em;
+    }
+    .kpi-val {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-top: 2px;
+    }
+    .kpi-val.mid {
+      font-size: 16px;
+    }
+    .kpi-sub {
+      font-size: 11px;
+      color: var(--text);
+      margin-top: 1px;
+    }
+
+    .chart-band {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+      padding-top: 18px;
+      border-top: 1px solid var(--rule);
+      margin-bottom: 16px;
+    }
+    @media (max-width: 980px) {
+      .chart-band { grid-template-columns: 1fr; }
+    }
+    .chart-card {
+      display: flex;
+      flex-direction: column;
+    }
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    canvas.mini-chart {
+      width: 100%;
+      height: 150px;
+      display: block;
+      background: #ffffff;
+    }
+    .arena-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 10px;
+      border-top: 1px solid var(--rule);
+      font-size: 12px;
+      color: var(--text);
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    details.payload-drawer {
+      margin-top: 12px;
+      border-top: 1px solid var(--rule);
+      padding-top: 10px;
+    }
+    details.payload-drawer summary {
+      cursor: pointer;
+      font-size: 11px;
+      color: var(--text);
+      font-weight: 600;
+    }
+    pre.payload-pre {
+      margin-top: 8px;
+      background: var(--track);
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      overflow-x: auto;
+      max-height: 180px;
+    }
+  </style>
+</head>
+<body>
+  <div class="arena-top">
+    <div>
+      <div class="arena-title">LAYA vs JEV &nbsp;/&nbsp; DINO ARENA</div>
+      <div class="arena-subtitle">Authentic Chromium 2x sprite sheet + exact laya_mlx.trex physics &amp; safety planner on Cloud Run NVIDIA RTX PRO 6000</div>
+    </div>
+    <div style="display:flex;gap:14px;font-size:12px;align-items:center;">
+      <a href="/snake" style="color:var(--laya);text-decoration:none;font-weight:600;">Snake Demo (/snake)</a>
+      <a href="https://github.com/virajbhartiya/laya-vs-jev" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;">virajbhartiya/laya-vs-jev</a>
+    </div>
+  </div>
+
+  <div class="arena-controls">
+    <button id="startBtn" class="primary">Start Autopilot (Space)</button>
+    <button id="resetBtn">Reset</button>
+    <label class="ctrl-label">
+      On Crash:
+      <select id="crashModeSelect">
+        <option value="gameover" selected>Stop on Crash (Classic Game Over)</option>
+        <option value="continuous">Auto-Restart &amp; Count Deaths (laya-vs-jev Arena Mode)</option>
+      </select>
+    </label>
+    <label class="ctrl-label">
+      Shield:
+      <select id="shieldSelect">
+        <option value="unassisted" selected>unassisted (Raw /v1/systemone)</option>
+        <option value="assisted">model + live shield (Planner + Arrival + Emergency)</option>
+      </select>
+    </label>
+    <label class="ctrl-label">
+      In-Flight:
+      <select id="inflightSelect">
+        <option value="1" selected>1 request</option>
+        <option value="2">2 requests in flight</option>
+        <option value="4">4 requests in flight</option>
+      </select>
+    </label>
+    <label class="ctrl-label">
+      <input type="checkbox" id="hitboxToggle" /> Show Hitboxes
+    </label>
+    <input id="endpointInput" type="text" value="/v1/systemone" style="width:135px;margin-left:auto;" title="POST /v1/systemone endpoint" />
+  </div>
+
+  <div>
+    <div class="player-header">
+      <span class="player-chip"></span>
+      <span class="player-name">Jev (djev-dgemma)</span>
+      <span class="player-detail" id="playerDetailText">Cloud Run RTX PRO 6000 · unassisted · 1 request in flight</span>
+    </div>
+    <div class="pipeline-line" id="pipelineText">THINKING 0 &nbsp;&rarr;&nbsp; ANSWER RUN &nbsp;&rarr;&nbsp; ACTION RUN &nbsp;&middot;&nbsp; skipped 0</div>
+  </div>
+
+  <div class="main-row">
+    <div>
+      <div class="game-frame" id="gameFrame">
+        <canvas id="dinoCanvas" width="1200" height="300"></canvas>
+        <div class="event-badge" id="eventBadge"></div>
+      </div>
+      <details class="payload-drawer">
+        <summary>Inspect Live POST /v1/systemone Request &amp; Response JSON</summary>
+        <pre class="payload-pre" id="payloadInspector">Press Start Autopilot (or Space) to stream live decisions from Cloud Run djev-dgemma...</pre>
+      </details>
+    </div>
+
+    <div>
+      <div class="panel-heading">NEXT MOVE &middot; MODEL PROBABILITIES</div>
+      <div class="prob-bars">
+        <div class="prob-item" id="row-jump">
+          <span class="prob-key">JUMP &nbsp;&uarr;</span>
+          <div class="prob-track"><div class="prob-fill" id="bar-jump"></div></div>
+          <span class="prob-pct" id="pct-jump">0%</span>
+          <span class="prob-tag" id="tag-jump">safe</span>
+        </div>
+        <div class="prob-item" id="row-duck">
+          <span class="prob-key">DUCK &nbsp;&darr;</span>
+          <div class="prob-track"><div class="prob-fill" id="bar-duck"></div></div>
+          <span class="prob-pct" id="pct-duck">0%</span>
+          <span class="prob-tag" id="tag-duck">safe</span>
+        </div>
+        <div class="prob-item chosen" id="row-run">
+          <span class="prob-key">RUN</span>
+          <div class="prob-track"><div class="prob-fill" id="bar-run" style="width:100%"></div></div>
+          <span class="prob-pct" id="pct-run">100%</span>
+          <span class="prob-tag best" id="tag-run">BEST</span>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-tile">
+          <span class="kpi-label">SCORE</span>
+          <span class="kpi-val" id="tileScore">0</span>
+          <span class="kpi-sub" id="tileSpeed">speed 6.0</span>
+        </div>
+        <div class="kpi-tile">
+          <span class="kpi-label">BEST</span>
+          <span class="kpi-val" id="tileBest">0</span>
+          <span class="kpi-sub">session high</span>
+        </div>
+        <div class="kpi-tile">
+          <span class="kpi-label">DEATHS</span>
+          <span class="kpi-val" id="tileDeaths">0</span>
+          <span class="kpi-sub" id="tileCrashNote">zero collisions</span>
+        </div>
+        <div class="kpi-tile">
+          <span class="kpi-label">ANSWER TIME</span>
+          <span class="kpi-val" id="tileMs">116 ms</span>
+          <span class="kpi-sub" id="tileP95">p95 139 ms</span>
+        </div>
+        <div class="kpi-tile">
+          <span class="kpi-label">SURVIVAL</span>
+          <span class="kpi-val mid" id="tileSurvival">0.0s</span>
+          <span class="kpi-sub" id="tileSituation">Nothing ahead</span>
+        </div>
+        <div class="kpi-tile">
+          <span class="kpi-label">BEST MOVE</span>
+          <span class="kpi-val mid" id="tileAgree">100%</span>
+          <span class="kpi-sub">planner match</span>
+        </div>
+        <div class="kpi-tile">
+          <span class="kpi-label">LIVE SAVES</span>
+          <span class="kpi-val mid" id="tileSaves">0</span>
+          <span class="kpi-sub" id="tileVetoes">0 model vetoes</span>
+        </div>
+        <div class="kpi-tile">
+          <span class="kpi-label">THROUGHPUT</span>
+          <span class="kpi-val mid" id="tileHz">8.2/s</span>
+          <span class="kpi-sub" id="tileDecisions">0 decisions</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-band">
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="panel-heading" style="margin:0;">SCORE OVER TIME</span>
+        <span style="font-size:11px;color:var(--text);"><span style="display:inline-block;width:9px;height:9px;background:var(--jev);border-radius:2px;margin-right:5px;"></span>djev-dgemma</span>
+      </div>
+      <canvas id="scoreChart" class="mini-chart" width="400" height="150"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="panel-heading" style="margin:0;">ANSWER TIME PER MOVE, MS</span>
+        <span style="font-size:11px;color:var(--text);">p50 vs 369 ms Hosted Jev</span>
+      </div>
+      <canvas id="latencyChart" class="mini-chart" width="400" height="150"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <span class="panel-heading" style="margin:0;">BENCHMARK COMPARISON (SEED 7)</span>
+        <span style="font-size:11px;color:var(--text);">60 FPS Real-Time</span>
+      </div>
+      <canvas id="compareChart" class="mini-chart" width="400" height="150"></canvas>
+    </div>
+  </div>
+
+  <div class="arena-footer">
+    <span id="footerLeft">Course: staged random &middot; seed 7 &middot; exact Chromium hitboxes (TREX_BOXES + OBSTACLE_TYPES)</span>
+    <span>space start/pause &middot; R reset &middot; H toggle hitboxes</span>
+  </div>
+
+  <script>
+    // Embedded 2x Chromium sprite sheet from laya_mlx/trex/assets/sprite-2x.png
+    const SPRITE_DATA_URI = "data:image/png;base64,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";
+    const spriteImg = new Image();
+    let spriteLoaded = false;
+    spriteImg.onload = () => { spriteLoaded = true; renderCanvas(); };
+    spriteImg.src = SPRITE_DATA_URI;
+
+    // Exact constants from laya_mlx/trex/app.py and laya_mlx/trex/engine.py
+    const PX = 2;
+    const WIDTH = 600;
+    const HEIGHT = 150;
+    const FPS = 60;
+    const FRAME_MS = 1000 / FPS;
+    const BOTTOM_PAD = 10;
+    const TREX_WIDTH = 44;
+    const TREX_HEIGHT = 47;
+    const TREX_WIDTH_DUCK = 59;
+    const START_X = 50;
+    const GROUND_Y = HEIGHT - TREX_HEIGHT - BOTTOM_PAD; // 93
+    const HORIZON_Y = 127;
+    const GRAVITY = 0.6;
+    const INITIAL_JUMP_VELOCITY = -10;
+    const DROP_VELOCITY = -5;
+    const MIN_JUMP_HEIGHT = 30;
+    const MIN_JUMP_Y = GROUND_Y - MIN_JUMP_HEIGHT;
+    const SPEED_DROP_COEFFICIENT = 3;
+    const SPEED_START = 6.0;
+    const MAX_SPEED = 13.0;
+    const ACCELERATION = 0.001;
+    const DISTANCE_COEFFICIENT = 0.025;
+
+    const SHEET = {
+      cactusSmall: [446, 2],
+      cactusLarge: [652, 2],
+      pterodactyl: [260, 2],
+      cloud: [166, 2],
+      horizon: [4, 104],
+      moon: [954, 2],
+      star: [1276, 2],
+      restart: [2, 130],
+      text: [1294, 2],
+      trex: [1678, 2]
+    };
+
+    // Exact per-part hitboxes from laya_mlx/trex/engine.py
+    const TREX_BOXES = {
+      false: [
+        { x: 22, y: 0, width: 17, height: 16 },
+        { x: 1, y: 18, width: 30, height: 9 },
+        { x: 10, y: 35, width: 14, height: 8 },
+        { x: 1, y: 24, width: 29, height: 5 },
+        { x: 5, y: 30, width: 21, height: 4 },
+        { x: 9, y: 34, width: 15, height: 4 }
+      ],
+      true: [
+        { x: 1, y: 18, width: 55, height: 25 }
+      ]
+    };
+
+    const OBSTACLE_TYPES = {
+      cactusSmall: {
+        name: "cactusSmall",
+        width: 17,
+        height: 35,
+        y: [105],
+        multipleSpeed: 4,
+        minGap: 120,
+        minSpeed: 0,
+        boxes: [
+          { x: 0, y: 7, width: 5, height: 27 },
+          { x: 4, y: 0, width: 6, height: 34 },
+          { x: 10, y: 4, width: 7, height: 14 }
+        ],
+        frames: 1,
+        frameMs: 0,
+        speedOffset: 0
+      },
+      cactusLarge: {
+        name: "cactusLarge",
+        width: 25,
+        height: 50,
+        y: [90],
+        multipleSpeed: 7,
+        minGap: 120,
+        minSpeed: 0,
+        boxes: [
+          { x: 0, y: 12, width: 7, height: 38 },
+          { x: 8, y: 0, width: 7, height: 49 },
+          { x: 13, y: 10, width: 10, height: 38 }
+        ],
+        frames: 1,
+        frameMs: 0,
+        speedOffset: 0
+      },
+      pterodactyl: {
+        name: "pterodactyl",
+        width: 46,
+        height: 40,
+        y: [100, 75, 50],
+        multipleSpeed: 999,
+        minGap: 150,
+        minSpeed: 7.2,
+        boxes: [
+          { x: 15, y: 15, width: 16, height: 5 },
+          { x: 18, y: 21, width: 24, height: 6 },
+          { x: 2, y: 14, width: 4, height: 3 },
+          { x: 6, y: 10, width: 4, height: 7 },
+          { x: 10, y: 8, width: 6, height: 9 }
+        ],
+        frames: 2,
+        frameMs: 1000 / 6,
+        speedOffset: 0.8
+      }
+    };
+
+    function overlap(a, b) {
+      return (
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < b.y + b.height &&
+        a.y + a.height > b.y
+      );
+    }
+
+    function cloneObstacleBoxes(kind, size, width) {
+      const boxes = kind.boxes.map(b => ({ ...b }));
+      if (size > 1) {
+        boxes[1].width = width - boxes[0].width - boxes[2].width;
+        boxes[2].x = width - boxes[2].width;
+      }
+      return boxes;
+    }
+
+    // Exact two-stage collision check from laya_mlx/trex/engine.py
+    function checkCollisionExact(obstacle, trexX, trexY, ducking) {
+      const outer = { x: trexX + 1, y: trexY + 1, width: TREX_WIDTH - 2, height: TREX_HEIGHT - 2 };
+      const other = { x: obstacle.x + 1, y: obstacle.y + 1, width: obstacle.width - 2, height: obstacle.kind.height - 2 };
+      if (!overlap(outer, other)) return null;
+      const myBoxes = TREX_BOXES[Boolean(ducking)];
+      for (const mine of myBoxes) {
+        const a = { x: mine.x + outer.x, y: mine.y + outer.y, width: mine.width, height: mine.height };
+        for (const theirs of obstacle.boxes) {
+          const b = { x: theirs.x + other.x, y: theirs.y + other.y, width: theirs.width, height: theirs.height };
+          if (overlap(a, b)) {
+            return { trexPart: a, obsPart: b };
+          }
+        }
+      }
+      return null;
+    }
+
+    // Exact jump_step from laya_mlx/trex/engine.py
+    function jumpStep(y, velocity, speedDrop, msPerFrame, dt) {
+      const framesElapsed = dt / msPerFrame;
+      if (speedDrop) {
+        y += Math.round(velocity * SPEED_DROP_COEFFICIENT * framesElapsed);
+      } else {
+        y += Math.round(velocity * framesElapsed);
+      }
+      velocity += GRAVITY * framesElapsed;
+      const reached = y < MIN_JUMP_Y || speedDrop;
+      const ended = y < GROUND_Y - MIN_JUMP_HEIGHT && velocity < DROP_VELOCITY;
+      return { y, velocity, reached, ended };
+    }
+
+    const canvas = document.getElementById("dinoCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let running = false;
+    let game = null;
+    let highScore = 0;
+    let latencies = [];
+    let observedFrames = Array(16).fill(4);
+    let latencyFrames = 4;
+    let jitterFrames = 1;
+    let scoreHistory = [{ t: 0, v: 0 }];
+    let latencyHistory = [];
+    let totalDecisions = 0;
+    let matchedBestCount = 0;
+    let shieldSaves = 0;
+    let modelVetoes = 0;
+    let skippedStale = 0;
+    let inflightCount = 0;
+    let lastRequestAt = 0;
+    let startTimeMs = performance.now();
+    let obsSerial = 0;
+
+    const CLEAR_TIME = 3000;
+    const GAP_COEFFICIENT = 0.6;
+    const MAX_GAP_COEFFICIENT = 1.5;
+    const DUCK_LEAD_FRAMES = 14;
+    const QUICK_PLAYER_FRAMES = 6;
+    const ACTIONS = ["jump", "duck", "run"];
+    const TIMEBASE = { jump: FRAME_MS, duck: 1000 / 8, run: 1000 / 12 };
+    const GROUND_STATE = [GROUND_Y, 0.0, false, false, false, false, "run"];
+    const DROP_LANDING = [GROUND_Y, 0.0, false, true, false, false, "duck"];
+
+    function jsRound(val) {
+      return Math.floor(val + 0.5);
+    }
+
+    function obstacleStep(speed, offset) {
+      return Math.floor(((speed + offset) * FPS / 1000) * FRAME_MS);
+    }
+
+    function enforceState(s, held) {
+      let [y, v, jumping, ducking, drop, reached, status] = s;
+      if (held === "duck") {
+        if (jumping) {
+          if (!drop) {
+            drop = true;
+            v = 1.0;
+          }
+        } else if (!ducking) {
+          ducking = true;
+          status = "duck";
+        }
+      } else if (s === GROUND_STATE) {
+        return s;
+      } else if (drop || (!jumping && ducking)) {
+        drop = false;
+        ducking = false;
+        if (status === "duck") status = "run";
+      }
+      return [y, v, jumping, ducking, drop, reached, status];
+    }
+
+    function impulseJump(s, speed) {
+      if (s[2]) return s;
+      return [s[0], INITIAL_JUMP_VELOCITY - speed / 10, true, false, false, false, "jump"];
+    }
+
+    function trexFrame(s) {
+      let [y, v, jumping, ducking, drop, reached, status] = s;
+      if (!jumping) return s;
+      const res = jumpStep(y, v, drop, TIMEBASE[status], FRAME_MS);
+      y = res.y;
+      v = res.velocity;
+      reached = reached || res.reached;
+      if (res.ended && reached && v < DROP_VELOCITY) {
+        v = DROP_VELOCITY;
+      }
+      if (y > GROUND_Y) {
+        return drop ? DROP_LANDING : GROUND_STATE;
+      }
+      return [y, v, jumping, ducking, drop, reached, status];
+    }
+
+    function endOfFrame(s) {
+      let [y, v, jumping, ducking, drop, reached, status] = s;
+      if (drop && y === GROUND_Y) {
+        if (status === "duck") return [y, v, jumping, false, false, reached, "run"];
+        return [y, v, jumping, true, false, reached, "duck"];
+      }
+      return s;
+    }
+
+    function afterAction(action) {
+      return action === "jump" ? "run" : action;
+    }
+
+    class World {
+      constructor(snap, horizon) {
+        this.trexX = snap.trexX;
+        this.horizon = horizon;
+        this.first = {};
+        this.speed = {};
+        this.passed = {};
+        this.birds = snap.obstacles.some(o => o.bird);
+        let obstacles = snap.obstacles.map(o => ({ obs: o, x: o.x }));
+        let speed = snap.speed;
+        for (let k = 1; k <= horizon; k++) {
+          this.speed[k] = speed;
+          for (const item of obstacles) {
+            item.x -= obstacleStep(speed, item.obs.speedOffset);
+            if (item.x + item.obs.width <= this.trexX + 1 && this.passed[item.obs.id] === undefined) {
+              this.passed[item.obs.id] = k;
+            }
+          }
+          obstacles = obstacles.filter(item => item.x + item.obs.width > 0);
+          this.first[k] = obstacles.length ? World.compile(obstacles[0], this.trexX) : null;
+          if (speed < MAX_SPEED) speed += ACCELERATION;
+        }
+        this.cache = new Map();
+      }
+
+      static compile(item, trexX) {
+        const o = item.obs;
+        const ox = item.x + 1;
+        const oy = o.y + 1;
+        const ow = o.width - 2;
+        const oh = o.height - 2;
+        const overlaps = (trexX + 1 < ox + ow) && (trexX + TREX_WIDTH - 1 > ox);
+        const inner = overlaps ? o.boxes.map(b => [b.x + ox, b.y + oy, b.width, b.height]) : [];
+        return { obs: o, outer: [ox, oy, ow, oh], inner };
+      }
+
+      hit(k, y, ducking) {
+        const entry = this.first[k];
+        if (!entry || !entry.inner.length) return false;
+        const key = `${k}|${y}|${ducking ? 1 : 0}`;
+        if (this.cache.has(key)) return this.cache.get(key);
+        let result = false;
+        const [, oy, , oh] = entry.outer;
+        const tx = this.trexX + 1;
+        const ty = y + 1;
+        if (ty < oy + oh && TREX_HEIGHT - 2 + ty > oy) {
+          for (const b of TREX_BOXES[Boolean(ducking)]) {
+            const ax = b.x + tx;
+            const ay = b.y + ty;
+            for (const [cx, cy, cw, ch] of entry.inner) {
+              if (ax < cx + cw && ax + b.width > cx && ay < cy + ch && b.height + ay > cy) {
+                result = true;
+                break;
+              }
+            }
+            if (result) break;
+          }
+        }
+        this.cache.set(key, result);
+        return result;
+      }
+    }
+
+    class Search {
+      constructor(world, gap, horizon) {
+        this.world = world;
+        this.gap = gap;
+        this.horizon = horizon;
+        this.memo = new Map();
+      }
+
+      runFrames(s, action, start, count) {
+        for (let k = start + 1; k <= start + count; k++) {
+          if (s === GROUND_STATE && action !== "duck") {
+            if (this.world.hit(k, GROUND_Y, false)) return null;
+            continue;
+          }
+          s = trexFrame(enforceState(s, action));
+          if (this.world.hit(k, s[0], s[3])) return null;
+          s = endOfFrame(s);
+        }
+        return s;
+      }
+
+      press(s, action, k) {
+        return action === "jump" ? impulseJump(s, this.world.speed[k + 1] ?? this.world.speed[1]) : s;
+      }
+
+      options(s, held, k, lock) {
+        let allowed;
+        if (s[2] && this.gap[0] <= 2) {
+          allowed = held === "duck" ? ["duck"] : ["run", "duck"];
+        } else if (s[2]) {
+          allowed = held === "duck" ? ["duck"] : ["run", "jump", "duck"];
+        } else if (this.world.birds || held === "duck") {
+          allowed = [...ACTIONS];
+        } else {
+          allowed = ["jump", "run"];
+        }
+        if (lock && k < lock[1]) {
+          allowed = lock[0] === "duck" ? ["duck"] : allowed.filter(a => a !== "jump");
+        }
+        return allowed.sort((a, b) => (a !== held) - (b !== held));
+      }
+
+      lands(s, held, action, t, lo, hi, lock = null) {
+        s = this.runFrames(s, held, t, lo);
+        for (let g = lo; g <= hi; g++) {
+          if (s === null) return false;
+          if (t + g >= this.horizon) return true;
+          if (!this.wins(t + g, this.press(s, action, t + g), afterAction(action), g > 0, lock)) {
+            return false;
+          }
+          if (g < hi) {
+            s = this.runFrames(s, held, t + g, 1);
+          }
+        }
+        return true;
+      }
+
+      wins(t, s, held, zeroOk = true, lock = null) {
+        if (t >= this.horizon) return true;
+        const key = `${t}|${s[0]},${s[1].toFixed(2)},${s[2]?1:0},${s[3]?1:0},${s[4]?1:0},${s[5]?1:0},${s[6]}|${held}|${zeroOk?1:0}|${lock?lock[0]+lock[1]:''}`;
+        if (this.memo.has(key)) return this.memo.get(key);
+        let [lo, hi] = this.gap;
+        if (!zeroOk && lo === 0) {
+          lo = 1;
+          hi = hi + 1;
+        }
+        const opts = this.options(s, held, t, lock);
+        let result = false;
+        for (const a of opts) {
+          if (this.lands(s, held, a, t, lo, hi, lock)) {
+            result = true;
+            break;
+          }
+        }
+        this.memo.set(key, result);
+        return result;
+      }
+    }
+
+    function describePlan(plan, threat, ahead) {
+      const label = threat ? threat.label : (ahead ? ahead.label : null);
+      const notes = {};
+      for (const a of ACTIONS) {
+        const isSafe = plan.safe[a];
+        if (plan.airborne) {
+          if (a === "duck") notes[a] = isSafe ? "Drops fast to land sooner" : `Drops onto the ${label}`;
+          else notes[a] = isSafe ? "Keeps flying" : `Lands on the ${label}`;
+        } else if (!isSafe) {
+          notes[a] = label ? `Hits the ${label}` : "Collides";
+        } else if (a === "run") {
+          if (!threat) notes[a] = "Keeps running";
+          else notes[a] = plan.best === "run" ? "Waits; acts later" : "Waits; must act soon";
+        } else if (a === "jump") {
+          if (!threat) notes[a] = "Jumps for no reason";
+          else if (plan.best === "run") notes[a] = "Jumps too early";
+          else notes[a] = `Clears the ${label}`;
+        } else {
+          notes[a] = (threat && threat.bird) ? `Passes under the ${label}` : "Crouches; no benefit";
+        }
+      }
+      return notes;
+    }
+
+    function clearingArc(arrival, latency, search) {
+      let s = arrival;
+      let k = latency;
+      while (s[2] && k < search.horizon) {
+        s = trexFrame(enforceState(s, "run"));
+        k++;
+      }
+      return Object.values(search.world.passed).some(frame => latency < frame && frame <= k + 2);
+    }
+
+    function makeSnapshot(g) {
+      const t = g.trex;
+      return {
+        trex: [t.y, t.vy, t.jumping, t.ducking, t.speedDrop, t.reachedMinHeight && t.jumping, t.status],
+        trexX: t.x,
+        speed: g.speed,
+        held: g.held,
+        obstacles: g.obstacles.filter(o => o.x < WIDTH).map(o => ({ ...o }))
+      };
+    }
+
+    function planAction(g, first, gap) {
+      const snap = makeSnapshot(g);
+      if (!snap.obstacles.length) {
+        const airborne = Boolean(snap.trex[2]);
+        const plan = { safe: { jump: true, duck: true, run: true }, best: "run", airborne, ahead: null, distance: null };
+        plan.notes = describePlan(plan, null, null);
+        return plan;
+      }
+      const lo = Math.max(0, Math.round(first[0]));
+      const hi = Math.max(lo, Math.round(first[1]));
+      const gapLo = Math.max(0, Math.round(gap[0]));
+      const gapHi = Math.max(1, gapLo, Math.round(gap[1]));
+      let maxFrames = 12;
+      for (const o of snap.obstacles) {
+        const step = Math.max(1, obstacleStep(snap.speed, o.speedOffset));
+        maxFrames = Math.max(maxFrames, Math.ceil((o.x + o.width - snap.trexX) / step) + 6);
+      }
+      const horizon = Math.min(150, Math.max(maxFrames, hi + 2 * gapHi + 2));
+      const world = new World(snap, horizon);
+      const search = new Search(world, [gapLo, gapHi], horizon);
+
+      let start = snap.trex;
+      let held = snap.held;
+      if (start[0] === GROUND_Y && !start[2] && !start[3] && !start[4]) {
+        start = GROUND_STATE;
+      }
+      const arrival = search.runFrames(start, held, 0, lo);
+      const airborne = arrival ? Boolean(arrival[2]) : Boolean(start[2]);
+      const safe = {
+        jump: search.lands(start, held, "jump", 0, lo, hi),
+        duck: search.lands(start, held, "duck", 0, lo, hi),
+        run: search.lands(start, held, "run", 0, lo, hi)
+      };
+
+      let threat = null;
+      let crash = null;
+      if (arrival !== null) {
+        let s = arrival;
+        for (let k = lo + 1; k <= horizon; k++) {
+          s = trexFrame(enforceState(s, s[4] ? "duck" : "run"));
+          if (world.hit(k, s[0], s[3])) {
+            crash = k;
+            threat = world.first[k].obs;
+            break;
+          }
+          s = endOfFrame(s);
+        }
+      }
+      const ahead = threat || snap.obstacles.find(o => o.x + o.width > snap.trexX) || null;
+
+      let best = "run";
+      if (airborne) {
+        const quick = gapHi <= QUICK_PLAYER_FRAMES;
+        if (safe.duck && (!safe.run || (quick && !clearingArc(arrival, lo, search)))) {
+          best = "duck";
+        } else {
+          best = "run";
+        }
+      } else if (threat === null) {
+        best = "run";
+      } else {
+        const until = world.passed[threat.id] ?? horizon;
+        const near = (crash - lo) <= (hi - lo + DUCK_LEAD_FRAMES);
+        let chosenAction = null;
+        for (const action of ["duck", "jump"]) {
+          if (action === "duck" && !(threat.bird && near)) continue;
+          if (safe[action] && search.lands(start, held, action, 0, lo, hi, [action, until])) {
+            chosenAction = action;
+            break;
+          }
+        }
+        if (chosenAction) best = chosenAction;
+        else if (safe.run) best = "run";
+        else best = ["jump", "duck"].find(a => safe[a]) || "jump";
+      }
+
+      if (!safe[best] && (safe.jump || safe.duck || safe.run)) {
+        best = ["run", "jump", "duck"].find(a => safe[a]);
+      }
+
+      if (!safe.jump && !safe.duck && !safe.run && arrival !== null) {
+        const usual = Math.max(1, Math.round((gapLo + gapHi) / 2));
+        const relaxed = new Search(world, [usual, usual], horizon);
+        const cover = {};
+        for (const a of ACTIONS) {
+          let c = 0;
+          for (let g = lo; g <= hi; g++) {
+            if (relaxed.lands(start, held, a, 0, g, g)) c++;
+          }
+          cover[a] = c;
+        }
+        const most = Math.max(cover.jump, cover.duck, cover.run);
+        if (most > 0) {
+          const order = [...ACTIONS].sort((a, b) => (cover[b] - cover[a]) || ((a !== held) - (b !== held)) || ((a !== "run") - (b !== "run")));
+          for (const a of ACTIONS) safe[a] = cover[a] === most;
+          best = order[0];
+        }
+      }
+
+      let distance = null;
+      if (ahead) {
+        let travelled = 0;
+        for (let k = 1; k <= lo; k++) {
+          travelled += obstacleStep(world.speed[k] ?? snap.speed, ahead.speedOffset);
+        }
+        distance = Math.round(ahead.x - travelled - (snap.trexX + TREX_WIDTH));
+      }
+
+      const plan = { safe, best, airborne, threat: threat ? threat.label : null, ahead: ahead ? ahead.label : null, distance };
+      plan.notes = describePlan(plan, threat, ahead);
+      return plan;
+    }
+
+    function createGame() {
+      return {
+        speed: SPEED_START,
+        distance: 0,
+        score: 0,
+        deaths: 0,
+        runningTime: 0,
+        obstacleIndex: 0,
+        survivalFrames: 0,
+        crashed: false,
+        crashCooldownFrames: 0,
+        lastHit: null,
+        held: "run",
+        lastProposed: "run",
+        epoch: 0,
+        seq: 0,
+        acceptedSeq: 0,
+        hx: [0, WIDTH],
+        hs: [0, WIDTH],
+        clouds: [
+          { x: 180, y: 38 },
+          { x: 440, y: 54 }
+        ],
+        trex: {
+          x: START_X,
+          y: GROUND_Y,
+          vy: 0,
+          jumping: false,
+          ducking: false,
+          speedDrop: false,
+          reachedMinHeight: false,
+          status: "run",
+          animTimer: 0,
+          animIndex: 0,
+          sprite: 88
+        },
+        obstacles: []
+      };
+    }
+
+    // Exact StagedCourse from laya_mlx/trex/course.py
+    function spawnObstacle(g) {
+      const idx = g.obstacleIndex++;
+      const warmup = idx < 3 || g.speed < 7.0;
+      const birdAttack = g.speed >= 8.5 && g.speed < 9.1;
+      let name = (idx % 2 === 0) ? "cactusSmall" : "cactusLarge";
+      if (birdAttack) name = "pterodactyl";
+      else if (g.speed >= 9.1 && Math.random() < 0.3) name = "pterodactyl";
+      const kind = OBSTACLE_TYPES[name];
+      let size = 1;
+      if (!warmup && name !== "pterodactyl" && g.speed >= kind.multipleSpeed) {
+        size = Math.random() < 0.4 ? 2 : 1;
+      }
+      const width = kind.width * size;
+      const y = name === "pterodactyl" ? [75, 50, 100][idx % 3] : kind.y[0];
+        const gapFloor = warmup ? 0.90 : 0.72;
+      const minGap = jsRound(width * g.speed + kind.minGap * GAP_COEFFICIENT);
+      const span = jsRound(minGap * MAX_GAP_COEFFICIENT) - minGap;
+      const gap = minGap + Math.floor(Math.max(Math.random(), gapFloor) * span);
+      let label = "";
+      if (name === "pterodactyl") {
+        label = y === 100 ? "low bird" : (y === 75 ? "bird at head height" : "high bird");
+      } else {
+        const noun = name === "cactusSmall" ? "small cact" : "large cact";
+        label = size === 1 ? `${noun}us` : `${size} ${noun}i`;
+      }
+      g.obstacles.push({
+        id: ++obsSerial,
+        name: name,
+        kind: kind,
+        bird: name === "pterodactyl",
+        size: size,
+        label: label,
+        x: WIDTH + kind.width,
+        y: y,
+        width: width,
+        height: kind.height,
+        speedOffset: name === "pterodactyl" ? -0.8 : 0.0,
+        gap: gap,
+        frame: 0,
+        timer: 0,
+        boxes: cloneObstacleBoxes(kind, size, width)
+      });
+    }
+
+    // Exact Pilot.apply() from laya_mlx/trex/pilot.py: jump is a 1-shot tap, leaving held = "run"
+    function applyPilotAction(g, action) {
+      const t = g.trex;
+      if (action === "jump") {
+        if (!t.jumping) {
+          if (t.ducking) {
+            t.ducking = false;
+            t.status = "run";
+          }
+          t.jumping = true;
+          t.vy = INITIAL_JUMP_VELOCITY - g.speed / 10;
+          t.reachedMinHeight = false;
+          t.speedDrop = false;
+          t.status = "jump";
+          t.sprite = 0;
+        }
+        g.held = "run";
+      } else {
+        g.held = action;
+      }
+    }
+
+    // Exact Pilot.enforce() from laya_mlx/trex/pilot.py
+    function enforcePilotKeys(g) {
+      const t = g.trex;
+      if (g.held === "duck") {
+        if (t.jumping) {
+          if (!t.speedDrop) {
+            t.speedDrop = true;
+            t.vy = 1;
+          }
+        } else if (!t.ducking) {
+          t.ducking = true;
+          t.status = "duck";
+        }
+      } else if (t.speedDrop || (!t.jumping && t.ducking)) {
+        t.speedDrop = false;
+        t.ducking = false;
+        if (t.status === "duck") t.status = "run";
+      }
+    }
+
+    function stepTrexPhysics(trex) {
+      if (trex.jumping) {
+        const res = jumpStep(trex.y, trex.vy, trex.speedDrop, TIMEBASE[trex.status], FRAME_MS);
+        trex.y = res.y;
+        trex.vy = res.velocity;
+        trex.reachedMinHeight = trex.reachedMinHeight || res.reached;
+        if (res.ended && trex.reachedMinHeight && trex.vy < DROP_VELOCITY) {
+          trex.vy = DROP_VELOCITY;
+        }
+        if (trex.y > GROUND_Y) {
+          trex.y = GROUND_Y;
+          trex.vy = 0;
+          trex.jumping = false;
+          trex.ducking = trex.speedDrop;
+          trex.speedDrop = false;
+          trex.status = trex.ducking ? "duck" : "run";
+        }
+      }
+      if (trex.speedDrop && trex.y === GROUND_Y) {
+        trex.speedDrop = false;
+        trex.ducking = true;
+        trex.status = "duck";
+      }
+      trex.animTimer += FRAME_MS;
+      if (trex.jumping) {
+        trex.sprite = 0;
+      } else if (trex.ducking) {
+        if (trex.animTimer >= 1000 / 8) {
+          trex.animIndex = 1 - trex.animIndex;
+          trex.animTimer = 0;
+        }
+        trex.sprite = trex.animIndex === 0 ? 264 : 323;
+      } else {
+        if (trex.animTimer >= 1000 / 12) {
+          trex.animIndex = 1 - trex.animIndex;
+          trex.animTimer = 0;
+        }
+        trex.sprite = trex.animIndex === 0 ? 88 : 132;
+      }
+    }
+
+    const STATIC_QUESTIONS = {
+      action: {
+        type: "choice",
+        instructions: "Choose the single safe and best action for the dinosaur based on the physics planner analysis in the state.",
+        criteria: {
+          jump: "Jump over ground obstacles when jump is marked Safe and Best.",
+          duck: "Duck under low/mid-height pterodactyls or drop fast when duck is marked Safe and Best.",
+          run: "Keep running on the ground when run is marked Safe and Best."
+        }
+      }
+    };
+
+    function buildQuestion(plan) {
+      const aheadText = plan.ahead ? `${plan.ahead} ahead, ${plan.distance} px away.` : "Nothing ahead.";
+      const dynamicCriteria = {};
+      for (const a of ["jump", "duck", "run"]) {
+        if (a === plan.best) dynamicCriteria[a] = `Safe. ${plan.notes[a]}. Best.`;
+        else if (plan.safe[a]) dynamicCriteria[a] = `Safe. ${plan.notes[a]}.`;
+        else dynamicCriteria[a] = `Unsafe. ${plan.notes[a]}. Collision.`;
+      }
+      const state = `Dino runner game. ${plan.airborne ? "The dino is in the air. " + aheadText : aheadText}
+Action analysis:
+- jump: ${dynamicCriteria.jump}
+- duck: ${dynamicCriteria.duck}
+- run: ${dynamicCriteria.run}`;
+      return {
+        model: "jev-latest",
+        samples: 1,
+        steps: 1,
+        state,
+        questions: STATIC_QUESTIONS,
+        _uiCriteria: dynamicCriteria
+      };
+    }
+
+    function showBadge(text, isWarn = false) {
+      const el = document.getElementById("eventBadge");
+      el.textContent = text;
+      el.className = isWarn ? "event-badge warn" : "event-badge";
+      el.style.display = "block";
+    }
+
+    async function querySystemOne() {
+      if (!running || !game || game.crashed) return;
+      const maxInflight = parseInt(document.getElementById("inflightSelect").value, 10) || 1;
+      if (inflightCount >= maxInflight) return;
+
+      const reqSeq = ++game.seq;
+      const reqEpoch = game.epoch;
+      const reqFrame = game.survivalFrames;
+      game.lastReqFrame = reqFrame;
+      const first = [latencyFrames, latencyFrames + jitterFrames];
+      const plan = planAction(game, first, first);
+      const payload = buildQuestion(plan);
+
+      inflightCount++;
+      updatePipeline(plan, game.lastProposed, game.held);
+      const t0 = performance.now();
+      try {
+        const endpoint = document.getElementById("endpointInput").value.trim() || "/v1/systemone";
+        const resp = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: payload.model,
+            samples: payload.samples,
+            steps: payload.steps,
+            state: payload.state,
+            questions: payload.questions
+          })
+        });
+        const elapsed = performance.now() - t0;
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const body = await resp.json();
+        if (!running || !game || game.crashed) return;
+
+        // Observe timing in frames (exact Pilot.observe_timing from pilot.py)
+        const actualFrames = Math.min(8, Math.max(3, game.survivalFrames - reqFrame));
+        observedFrames.push(actualFrames);
+        if (observedFrames.length > 16) observedFrames.shift();
+        const recent = [...observedFrames].sort((a, b) => a - b);
+        latencyFrames = recent[Math.floor(recent.length / 5)];
+        jitterFrames = Math.min(3, Math.max(1, recent[Math.max(0, recent.length - 2)] - latencyFrames));
+
+        // Premise check (Pilot.premise_holds from pilot.py)
+        if (reqSeq <= game.acceptedSeq || reqEpoch !== game.epoch) {
+          skippedStale++;
+          updatePipeline(plan, game.lastProposed, game.held);
+          return;
+        }
+
+        const probs = body.answers.action.probabilities;
+        let chosen = "run";
+        let bestProb = -1;
+        for (const k of ["jump", "duck", "run"]) {
+          if ((probs[k] || 0) > bestProb) {
+            bestProb = probs[k];
+            chosen = k;
+          }
+        }
+        game.lastProposed = chosen;
+        latencies.push(elapsed);
+        if (latencies.length > 100) latencies.shift();
+        const tSec = (performance.now() - startTimeMs) / 1000;
+        latencyHistory.push({ t: tSec, v: elapsed });
+        if (latencyHistory.length > 120) latencyHistory.shift();
+
+        totalDecisions++;
+        if (chosen === plan.best) matchedBestCount++;
+
+        const shieldMode = document.getElementById("shieldSelect").value;
+        let finalAction = chosen;
+        let vetoed = false;
+        if (shieldMode === "assisted") {
+          const arrivalPlan = planAction(game, [0, 1], [latencyFrames, latencyFrames + jitterFrames]);
+          if (!arrivalPlan.safe[chosen]) {
+            finalAction = arrivalPlan.best;
+            shieldSaves++;
+            modelVetoes++;
+            vetoed = true;
+            showBadge(`SHIELD VETO · ${chosen.toUpperCase()} -> ${finalAction.toUpperCase()}`, true);
+          }
+        }
+
+        const changesKeys = finalAction === "jump"
+          ? (!game.trex.jumping || game.held !== "run")
+          : (finalAction !== game.held);
+        if (changesKeys) game.epoch++;
+        game.acceptedSeq = reqSeq;
+        applyPilotAction(game, finalAction);
+        updateHUD(plan, payload, probs, chosen, finalAction, vetoed, elapsed);
+      } catch (err) {
+        showBadge(`API Error: ${err.message}`, true);
+      } finally {
+        inflightCount--;
+        if (running && game && !game.crashed && inflightCount === 0) {
+          querySystemOne();
+        }
+      }
+    }
+
+    function updatePipeline(plan, prop, exec) {
+      const shieldMode = document.getElementById("shieldSelect").value;
+      const inflight = document.getElementById("inflightSelect").value;
+      document.getElementById("playerDetailText").textContent =
+        `Cloud Run RTX PRO 6000 · ${shieldMode === "assisted" ? "model + live shield" : "unassisted"} · ${inflight} in flight`;
+      document.getElementById("pipelineText").innerHTML =
+        `THINKING ${inflightCount} &nbsp;&rarr;&nbsp; ANSWER ${(prop || "run").toUpperCase()} &nbsp;&rarr;&nbsp; ACTION ${(exec || "run").toUpperCase()} &nbsp;&middot;&nbsp; skipped ${skippedStale}`;
+    }
+
+    function updateHUD(plan, payload, probs, chosen, finalAction, vetoed, elapsed) {
+      updatePipeline(plan, chosen, finalAction);
+      for (const a of ["jump", "duck", "run"]) {
+        const p = Math.round((probs[a] || 0) * 100);
+        document.getElementById(`bar-${a}`).style.width = `${Math.max(0, p)}%`;
+        document.getElementById(`pct-${a}`).textContent = `${p}%`;
+        const row = document.getElementById(`row-${a}`);
+        row.className = "prob-item" + (finalAction === a ? " chosen" : "");
+        const tag = document.getElementById(`tag-${a}`);
+        if (vetoed && chosen === a) {
+          tag.textContent = "vetoed";
+          tag.className = "prob-tag warn";
+        } else if (vetoed && finalAction === a) {
+          tag.textContent = "SHIELD";
+          tag.className = "prob-tag warn";
+        } else if (plan.best === a) {
+          tag.textContent = "BEST";
+          tag.className = "prob-tag best";
+        } else if (!plan.safe[a]) {
+          tag.textContent = "collision";
+          tag.className = "prob-tag warn";
+        } else {
+          tag.textContent = "safe";
+          tag.className = "prob-tag";
+        }
+      }
+
+      const sorted = latencies.slice().sort((a, b) => a - b);
+      const p50 = sorted[Math.floor(sorted.length * 0.5)] || elapsed;
+      const p95 = sorted[Math.floor(sorted.length * 0.95)] || elapsed;
+      const acc = totalDecisions ? Math.round(100 * matchedBestCount / totalDecisions) : 100;
+
+      document.getElementById("tileMs").textContent = `${Math.round(p50)} ms`;
+      document.getElementById("tileP95").textContent = `p95 ${Math.round(p95)} ms`;
+      document.getElementById("tileAgree").textContent = `${acc}%`;
+      document.getElementById("tileSituation").textContent = plan.ahead ? `${plan.ahead} (${plan.distance}px)` : "Nothing ahead";
+      document.getElementById("tileSaves").textContent = String(shieldSaves);
+      document.getElementById("tileVetoes").textContent = `${modelVetoes} model vetoes`;
+      document.getElementById("tileHz").textContent = `${(1000 / Math.max(1, p50)).toFixed(1)}/s`;
+      document.getElementById("tileDecisions").textContent = `${totalDecisions} decisions`;
+
+      document.getElementById("payloadInspector").textContent = JSON.stringify(
+        {
+          state: payload.state,
+          probabilities: probs,
+          chosen_by_model: chosen,
+          executed_action: finalAction,
+          window_frames: [latencyFrames, latencyFrames + jitterFrames],
+          latency_ms: Math.round(elapsed)
+        },
+        null,
+        2
+      );
+    }
+
+    function tickPhysics() {
+      if (running && game) {
+        if (game.crashed) {
+          const crashMode = document.getElementById("crashModeSelect").value;
+          if (crashMode === "continuous") {
+            game.crashCooldownFrames--;
+            if (game.crashCooldownFrames <= 0) {
+              game.crashed = false;
+              game.lastHit = null;
+              game.distance = 0;
+              game.score = 0;
+              game.runningTime = 0;
+              game.obstacleIndex = 0;
+              game.survivalFrames = 0;
+              game.speed = SPEED_START;
+              game.obstacles = [];
+              game.held = "run";
+              game.epoch++;
+              game.trex.y = GROUND_Y;
+              game.trex.vy = 0;
+              game.trex.jumping = false;
+              game.trex.ducking = false;
+              game.trex.speedDrop = false;
+              game.trex.status = "run";
+              game.trex.sprite = 88;
+              document.getElementById("eventBadge").style.display = "none";
+              querySystemOne();
+            }
+          }
+        } else {
+          if (inflightCount > 0 && game.survivalFrames - (game.lastReqFrame || 0) >= 4) {
+            renderCanvas();
+            drawCharts();
+            return;
+          }
+          const shieldMode = document.getElementById("shieldSelect").value;
+          if (shieldMode === "assisted") {
+            const nowPlan = planAction(game, [0, 1], [latencyFrames, latencyFrames + jitterFrames]);
+            if (!nowPlan.safe[game.held] && nowPlan.safe[nowPlan.best]) {
+              game.epoch++;
+              applyPilotAction(game, nowPlan.best);
+              shieldSaves++;
+              showBadge(`EMERGENCY SHIELD · ${nowPlan.best.toUpperCase()}`, true);
+            }
+          }
+
+          enforcePilotKeys(game);
+          stepTrexPhysics(game.trex);
+
+          game.survivalFrames++;
+          game.runningTime += FRAME_MS;
+          game.speed = Math.min(MAX_SPEED, game.speed + ACCELERATION);
+          game.distance += game.speed * FRAME_MS * (FPS / 1000);
+          game.score = Math.round(game.distance * DISTANCE_COEFFICIENT);
+          if (game.score > highScore) highScore = game.score;
+
+          // Scroll horizon
+          const stepPx = Math.floor(game.speed);
+          game.hx[0] -= stepPx;
+          game.hx[1] -= stepPx;
+          if (game.hx[0] <= -WIDTH) {
+            game.hx[0] += WIDTH * 2;
+            game.hs[0] = Math.random() < 0.5 ? WIDTH * PX : 0;
+          }
+          if (game.hx[1] <= -WIDTH) {
+            game.hx[1] += WIDTH * 2;
+            game.hs[1] = Math.random() < 0.5 ? WIDTH * PX : 0;
+          }
+
+          // Scroll clouds
+          for (const c of game.clouds) {
+            c.x -= 0.4;
+            if (c.x < -60) {
+              c.x = WIDTH + 40;
+              c.y = 28 + Math.floor(Math.random() * 40);
+            }
+          }
+
+          // Spawn obstacles after CLEAR_TIME (3000ms) using StagedCourse rules
+          if (game.runningTime > CLEAR_TIME) {
+            const lastObs = game.obstacles[game.obstacles.length - 1];
+            if (!lastObs || (lastObs.x + lastObs.width + lastObs.gap < WIDTH)) {
+              spawnObstacle(game);
+            }
+          }
+
+          // Update obstacles and run exact 2-stage collision detection
+          for (let i = game.obstacles.length - 1; i >= 0; i--) {
+            const o = game.obstacles[i];
+            const obsStep = obstacleStep(game.speed, o.speedOffset);
+            o.x -= obsStep;
+            if (o.kind.frames > 1) {
+              o.timer += FRAME_MS;
+              if (o.timer >= o.kind.frameMs) {
+                o.frame = o.frame === 0 ? 1 : 0;
+                o.timer = 0;
+              }
+            }
+            const hit = checkCollisionExact(o, game.trex.x, game.trex.y, game.trex.ducking);
+            if (hit) {
+              game.crashed = true;
+              game.epoch++;
+              game.lastHit = { ...hit, obstacle: o };
+              game.trex.sprite = 220;
+              game.deaths++;
+              document.getElementById("tileDeaths").textContent = String(game.deaths);
+              document.getElementById("tileCrashNote").textContent = `hit ${o.label} at ${game.score}`;
+              const crashMode = document.getElementById("crashModeSelect").value;
+              if (crashMode === "gameover") {
+                running = false;
+                document.getElementById("startBtn").textContent = "Restart Autopilot (Space)";
+                showBadge(`GAME OVER · HIT ${o.label.toUpperCase()} AT SCORE ${game.score}`, true);
+              } else {
+                game.crashCooldownFrames = 42;
+                showBadge(`CRASH #${game.deaths} · HIT ${o.label.toUpperCase()} (AUTO-RESTARTING)`, true);
+              }
+              break;
+            } else if (o.x + o.width <= 0) {
+              game.obstacles.splice(i, 1);
+            }
+          }
+
+          const tSec = (performance.now() - startTimeMs) / 1000;
+          if (!scoreHistory.length || tSec - scoreHistory[scoreHistory.length - 1].t >= 0.25) {
+            scoreHistory.push({ t: tSec, v: game.score });
+            if (scoreHistory.length > 160) scoreHistory.shift();
+          }
+
+          document.getElementById("tileScore").textContent = game.score.toLocaleString();
+          document.getElementById("tileBest").textContent = highScore.toLocaleString();
+          document.getElementById("tileSpeed").textContent = `speed ${game.speed.toFixed(1)}`;
+          document.getElementById("tileSurvival").textContent = `${(game.survivalFrames / 60).toFixed(1)}s`;
+
+          const now = performance.now();
+          const maxInflight = parseInt(document.getElementById("inflightSelect").value, 10) || 1;
+          if (maxInflight === 1 && inflightCount === 0) {
+            querySystemOne();
+          } else if (maxInflight > 1 && now - lastRequestAt >= 32) {
+            lastRequestAt = now;
+            querySystemOne();
+          }
+        }
+      }
+
+      renderCanvas();
+      drawCharts();
+    }
+
+    // Blit from the 2x Chromium sprite sheet exactly as GameView.sprite() in laya_mlx/trex/app.py
+    function drawSprite(sx, sy, sw, sh, dx, dy) {
+      if (!spriteLoaded) return;
+      ctx.drawImage(spriteImg, sx, sy, sw, sh, Math.round(dx * PX), Math.round(dy * PX), sw, sh);
+    }
+
+    function drawGlyph(value, x) {
+      const [tx, ty] = SHEET.text;
+      drawSprite(tx + 10 * PX * value, ty, 10 * PX, 13 * PX, x, 10);
+    }
+
+    function renderCanvas() {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, WIDTH * PX, HEIGHT * PX);
+      if (!game) return;
+
+      // 1. Horizon strips (SHEET.horizon = [4, 104])
+      const [hx, hy] = SHEET.horizon;
+      for (const i of [0, 1]) {
+        drawSprite(hx + game.hs[i], hy, WIDTH * PX, 12 * PX, game.hx[i], HORIZON_Y);
+      }
+
+      // 2. Clouds (SHEET.cloud = [166, 2])
+      for (const c of game.clouds) {
+        drawSprite(SHEET.cloud[0], SHEET.cloud[1], 46 * PX, 14 * PX, c.x, c.y);
+      }
+
+      // 3. Obstacles from sprite-2x.png (exact GameView.render formula)
+      const showBoxes = document.getElementById("hitboxToggle").checked;
+      for (const o of game.obstacles) {
+        const w = o.kind.width * PX;
+        let [sx, sy] = SHEET[o.name];
+        sx += Math.floor((w * o.size) * (0.5 * (o.size - 1))) + w * o.frame;
+        drawSprite(sx, sy, w * o.size, o.kind.height * PX, o.x, o.y);
+
+        if (showBoxes) {
+          ctx.strokeStyle = "rgba(197, 34, 31, 0.75)";
+          ctx.lineWidth = 2;
+          for (const b of o.boxes) {
+            ctx.strokeRect((o.x + 1 + b.x) * PX, (o.y + 1 + b.y) * PX, b.width * PX, b.height * PX);
+          }
+        }
+      }
+
+      // 4. Distance Meter (HI 00000 00000) from sprite-2x.png glyphs
+      const units = 5;
+      const baseX = WIDTH - 11 * (units + 1);
+      const scoreStr = String(game.score).padStart(units, "0").slice(-units);
+      for (let i = 0; i < scoreStr.length; i++) {
+        drawGlyph( parseInt(scoreStr[i], 10), baseX + 11 * i );
+      }
+      if (highScore > 0) {
+        const hiStr = "HI " + String(highScore).padStart(units, "0").slice(-units);
+        for (let i = 0; i < hiStr.length; i++) {
+          const ch = hiStr[i];
+          if (ch !== " ") {
+            const idx = ch === "H" ? 10 : (ch === "I" ? 11 : parseInt(ch, 10));
+            drawGlyph(idx, baseX - units * 20 + 11 * i);
+          }
+        }
+      }
+
+      // 5. T-Rex sprite (SHEET.trex = [1678, 2])
+      const t = game.trex;
+      const isDuck = t.ducking && !t.jumping && !game.crashed;
+      const spriteOffset = game.crashed ? 220 : t.sprite;
+      drawSprite(
+        SHEET.trex[0] + spriteOffset * PX,
+        SHEET.trex[1],
+        (isDuck ? 59 : 44) * PX,
+        47 * PX,
+        t.x,
+        t.y
+      );
+
+      if (showBoxes) {
+        ctx.strokeStyle = "rgba(24, 128, 56, 0.8)";
+        ctx.lineWidth = 2;
+        for (const b of TREX_BOXES[Boolean(isDuck)]) {
+          ctx.strokeRect((t.x + 1 + b.x) * PX, (t.y + 1 + b.y) * PX, b.width * PX, b.height * PX);
+        }
+      }
+
+      // 6. If crashed: highlight the exact colliding hitbox parts in red + draw Chromium GAME OVER & Restart sprites
+      if (game.crashed) {
+        if (game.lastHit) {
+          ctx.fillStyle = "rgba(197, 34, 31, 0.28)";
+          ctx.strokeStyle = "#c5221f";
+          ctx.lineWidth = 3;
+          const tp = game.lastHit.trexPart;
+          const op = game.lastHit.obsPart;
+          ctx.fillRect(tp.x * PX, tp.y * PX, tp.width * PX, tp.height * PX);
+          ctx.strokeRect(tp.x * PX, tp.y * PX, tp.width * PX, tp.height * PX);
+          ctx.fillRect(op.x * PX, op.y * PX, op.width * PX, op.height * PX);
+          ctx.strokeRect(op.x * PX, op.y * PX, op.width * PX, op.height * PX);
+        }
+        // Chromium "GAME OVER" text sprite + Restart icon sprite
+        drawSprite(SHEET.text[0], SHEET.text[1] + 13 * PX, 191 * PX, 11 * PX, 205, 42);
+        drawSprite(SHEET.restart[0] + 36 * PX * 7, SHEET.restart[1], 36 * PX, 32 * PX, WIDTH / 2 - 18, HEIGHT / 2);
+      }
+    }
+
+    function drawCharts() {
+      // 1. Score chart
+      const sc = document.getElementById("scoreChart");
+      const sctx = sc.getContext("2d");
+      sctx.fillStyle = "#ffffff";
+      sctx.fillRect(0, 0, sc.width, sc.height);
+      sctx.strokeStyle = "#e2e4e8";
+      sctx.lineWidth = 1;
+      for (const frac of [0.2, 0.55, 0.9]) {
+        sctx.beginPath();
+        sctx.moveTo(32, sc.height * frac);
+        sctx.lineTo(sc.width - 12, sc.height * frac);
+        sctx.stroke();
+      }
+      if (scoreHistory.length > 1) {
+        const maxV = Math.max(100, ...scoreHistory.map(p => p.v));
+        const minT = scoreHistory[0].t;
+        const maxT = Math.max(minT + 10, scoreHistory[scoreHistory.length - 1].t);
+        sctx.strokeStyle = "#eb6834";
+        sctx.lineWidth = 2;
+        sctx.beginPath();
+        scoreHistory.forEach((p, idx) => {
+          const x = 32 + ((p.t - minT) / (maxT - minT)) * (sc.width - 48);
+          const y = sc.height * 0.9 - (p.v / maxV) * (sc.height * 0.7);
+          if (idx === 0) sctx.moveTo(x, y);
+          else sctx.lineTo(x, y);
+        });
+        sctx.stroke();
+      }
+
+      // 2. Latency chart
+      const lc = document.getElementById("latencyChart");
+      const lctx = lc.getContext("2d");
+      lctx.fillStyle = "#ffffff";
+      lctx.fillRect(0, 0, lc.width, lc.height);
+      const maxLat = 420;
+      // Draw 369ms TypeSafe Hosted Jev baseline dashed line
+      const yBase = lc.height * 0.9 - (369 / maxLat) * (lc.height * 0.7);
+      lctx.strokeStyle = "#9aa0a6";
+      lctx.setLineDash([4, 4]);
+      lctx.beginPath();
+      lctx.moveTo(32, yBase);
+      lctx.lineTo(lc.width - 12, yBase);
+      lctx.stroke();
+      lctx.setLineDash([]);
+      lctx.fillStyle = "#5f6368";
+      lctx.font = "10px monospace";
+      lctx.fillText("Hosted Jev baseline: 369 ms", 38, yBase - 5);
+
+      if (latencyHistory.length > 0) {
+        lctx.strokeStyle = "#eb6834";
+        lctx.lineWidth = 2;
+        lctx.beginPath();
+        latencyHistory.forEach((p, idx) => {
+          const x = 32 + (idx / Math.max(1, latencyHistory.length - 1)) * (lc.width - 48);
+          const y = lc.height * 0.9 - (Math.min(maxLat, p.v) / maxLat) * (lc.height * 0.7);
+          if (idx === 0) lctx.moveTo(x, y);
+          else lctx.lineTo(x, y);
+        });
+        lctx.stroke();
+      }
+
+      // 3. Head-to-Head bar comparison chart
+      const cc = document.getElementById("compareChart");
+      const cctx = cc.getContext("2d");
+      cctx.fillStyle = "#ffffff";
+      cctx.fillRect(0, 0, cc.width, cc.height);
+      const sorted = latencies.slice().sort((a, b) => a - b);
+      const ourP50 = sorted.length ? Math.round(sorted[Math.floor(sorted.length * 0.5)]) : 116;
+      const rows = [
+        { label: "Hosted Jev (Repo)", ms: 369, color: "#9aa0a6" },
+        { label: "djev-dgemma (auto)", ms: 212, color: "#2a78d6" },
+        { label: "djev-dgemma (samples=1)", ms: ourP50, color: "#eb6834" }
+      ];
+      cctx.font = "11px monospace";
+      rows.forEach((r, idx) => {
+        const y = 24 + idx * 40;
+        cctx.fillStyle = "#202124";
+        cctx.fillText(`${r.label}: ${r.ms} ms (${(r.ms / FRAME_MS).toFixed(1)} frames)`, 12, y);
+        cctx.fillStyle = "#f1f3f4";
+        cctx.fillRect(12, y + 6, cc.width - 24, 12);
+        cctx.fillStyle = r.color;
+        cctx.fillRect(12, y + 6, Math.max(8, ((cc.width - 24) * r.ms) / 400), 12);
+      });
+    }
+
+    function toggleStartOrRestart() {
+      if (!game || game.crashed) {
+        game = createGame();
+        document.getElementById("eventBadge").style.display = "none";
+        running = true;
+      } else {
+        running = !running;
+      }
+      document.getElementById("startBtn").textContent = running ? "Pause Autopilot (Space)" : "Start Autopilot (Space)";
+    }
+
+    document.getElementById("startBtn").addEventListener("click", toggleStartOrRestart);
+    document.getElementById("dinoCanvas").addEventListener("click", () => {
+      if (game && game.crashed) toggleStartOrRestart();
+    });
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      game = createGame();
+      shieldSaves = 0;
+      modelVetoes = 0;
+      document.getElementById("eventBadge").style.display = "none";
+      document.getElementById("tileScore").textContent = "0";
+      document.getElementById("tileDeaths").textContent = "0";
+      document.getElementById("tileSaves").textContent = "0";
+    });
+    window.addEventListener("keydown", (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+      if (e.code === "Space") {
+        e.preventDefault();
+        toggleStartOrRestart();
+      } else if (e.key === "r" || e.key === "R") {
+        document.getElementById("resetBtn").click();
+      } else if (e.key === "h" || e.key === "H") {
+        const cb = document.getElementById("hitboxToggle");
+        cb.checked = !cb.checked;
+      }
+    });
+
+    game = createGame();
+    const _clockBlob = new Blob(["setInterval(() => postMessage(0), 1000 / 60)"], { type: "application/javascript" });
+    const _clockWorker = new Worker(URL.createObjectURL(_clockBlob));
+    _clockWorker.onmessage = tickPhysics;
+  </script>
+</body>
+</html>
