@@ -3,7 +3,7 @@ set -euo pipefail
 
 echo "[ultra-fast-init] Starting at $(date -u +%Y-%m-%dT%H:%M:%S.%6NZ)"
 
-# 1. Stage small config/tokenizer/processor files immediately (including processor_config.json for Gemma4 vision)
+# 1. Stage small config/tokenizer/processor files immediately
 mkdir -p /dev/shm/dgemma
 for f in chat_template.jinja config.json generation_config.json hf_quant_config.json model.safetensors.index.json processor_config.json preprocessor_config.json tokenizer.json tokenizer_config.json; do
   if [ -f "/mnt/gcs/dgemma/$f" ]; then
@@ -23,9 +23,6 @@ if [ -d "/opt/dgemma/v9_baked/dgemma" ]; then
 fi
 if [ -d "/opt/dgemma/vllm_overlay" ]; then
   cp -rf /opt/dgemma/vllm_overlay/* /usr/local/lib/python3.12/dist-packages/vllm/
-fi
-if [ -f "/mnt/gcs/fast-init/vision.html" ]; then
-  cp -f /mnt/gcs/fast-init/vision.html /opt/dgemma/vision.html 2>/dev/null || true
 fi
 python3 -m compileall -f -q \
   /usr/local/lib/python3.12/dist-packages/vllm/model_executor/models/diffusion_gemma.py \
@@ -58,14 +55,11 @@ fi
 
 # 3. Single-process structured_server.py + In-Process vLLM Engine (VLLM_ENABLE_V1_MULTIPROCESSING=0)
 cat << 'PYEOF' > /tmp/run_inproc_server.py
-import base64
-import io
 import os
 import pathlib
 import sys
 import threading
 import time
-from PIL import Image as PILImage
 
 T_BOOT = time.time()
 os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"] = "0"
@@ -125,12 +119,6 @@ if os.path.exists("/opt/dgemma/dino.html"):
 if os.path.exists("/opt/dgemma/tetris.html"):
     S.PAGES["/tetris"] = "tetris.html"
     S.PAGES["/tetris.html"] = "tetris.html"
-if os.path.exists("/mnt/gcs/fast-init/vision.html"):
-    S.PAGES["/vision"] = "/mnt/gcs/fast-init/vision.html"
-    S.PAGES["/vision.html"] = "/mnt/gcs/fast-init/vision.html"
-elif os.path.exists("/opt/dgemma/vision.html"):
-    S.PAGES["/vision"] = "vision.html"
-    S.PAGES["/vision.html"] = "vision.html"
 
 S.ARGS = type("Args", (), {
     "upstream": "http://127.0.0.1:8000",
@@ -154,15 +142,6 @@ def patched_do_GET(self):
             if ENGINE_READY:
                 return self._json(200, {"status": "ok", "mode": "inproc-vllm"})
             return self._json(503, {"status": "starting"})
-        path_clean = self.path.split("?")[0]
-        if path_clean in ("/vision", "/vision.html") and os.path.exists("/mnt/gcs/fast-init/vision.html"):
-            body = open("/mnt/gcs/fast-init/vision.html", "rb").read()
-            self.send_response(200)
-            self.send_header("content-type", "text/html; charset=utf-8")
-            self.send_header("content-length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-            return
         return orig_do_GET(self)
     except BrokenPipeError:
         pass
@@ -191,53 +170,17 @@ BaseRenderer.warmup = lambda self, *a, **kw: None
 def _extract_top_dict(lp_dict):
     return {int(k): float(v.logprob if hasattr(v, "logprob") else v) for k, v in lp_dict.items()}
 
-def _extract_chat_messages_mm(msgs, thinking=False):
-    pil_images = []
-    norm_msgs = []
-    for m in msgs:
-        c = m.get("content")
-        if isinstance(c, list):
-            new_c = []
-            for part in c:
-                ptype = part.get("type")
-                if ptype == "image_url":
-                    url = (part.get("image_url") or {}).get("url", "")
-                    if ";base64," in url:
-                        b64_data = url.split(";base64,", 1)[1]
-                        raw_bytes = base64.b64decode(b64_data)
-                        img = PILImage.open(io.BytesIO(raw_bytes)).convert("RGB")
-                        pil_images.append(img)
-                    new_c.append({"type": "image"})
-                elif ptype == "image":
-                    new_c.append({"type": "image"})
-                elif ptype == "text":
-                    new_c.append({"type": "text", "text": part.get("text", "")})
-            norm_msgs.append({"role": m.get("role", "user"), "content": new_c})
-        else:
-            norm_msgs.append(m)
-    out = S.TOK.apply_chat_template(
-        norm_msgs, tokenize=True, add_generation_prompt=True, enable_thinking=thinking
-    )
-    prompt_ids = [int(t) for t in (out["input_ids"] if hasattr(out, "keys") else out)]
-    mm_data = {"image": pil_images[0] if len(pil_images) == 1 else pil_images} if pil_images else None
-    return prompt_ids, mm_data
-
 def inproc_read_many(schema, template, slots, sys_text, state_content, seed, n, prefix=None, thinking=False):
     if prefix is not None:
-        prompt_ids, mm_data = prefix, None
+        prompt_ids = prefix
     elif isinstance(state_content, str):
-        prompt_ids, mm_data = S.chat_prompt_ids(sys_text, state_content, thinking=thinking), None
+        prompt_ids = S.chat_prompt_ids(sys_text, state_content, thinking=thinking)
     else:
-        prompt_ids, mm_data = _extract_chat_messages_mm(
+        prompt_ids = S.chat_messages_ids(
             [{"role": "system", "content": sys_text}, {"role": "user", "content": state_content}],
             thinking=thinking,
         )
-    prompts = [
-        {"prompt_token_ids": prompt_ids, "multi_modal_data": mm_data}
-        if mm_data is not None
-        else {"prompt_token_ids": prompt_ids}
-        for _ in range(n)
-    ]
+    prompts = [{"prompt_token_ids": prompt_ids} for _ in range(n)]
     lids = S.label_id_union(slots)
     num_lp = len(lids) if lids else S.TOPK
     cwidth = S.canvas_width(template)
@@ -258,11 +201,10 @@ def inproc_read_many(schema, template, slots, sys_text, state_content, seed, n, 
         )
         for k in range(n)
     ]
-    mm_extra = 280 if mm_data is not None else 0
     max_len = int(os.environ.get("MAX_MODEL_LEN", "4096"))
-    if len(prompt_ids) + mm_extra + S.canvas_width(template) > max_len:
+    if len(prompt_ids) + S.canvas_width(template) > max_len:
         raise S.SchemaError(
-            f"prompt ({len(prompt_ids) + mm_extra} tokens) + canvas ({S.canvas_width(template)}) exceeds max_model_len ({max_len})"
+            f"prompt ({len(prompt_ids)} tokens) + canvas ({S.canvas_width(template)}) exceeds max_model_len ({max_len})"
         )
     with ENGINE_LOCK:
         outputs = LLM_ENGINE.generate(prompts, sp_list, use_tqdm=False)
@@ -275,7 +217,7 @@ def inproc_read_many(schema, template, slots, sys_text, state_content, seed, n, 
             top = _extract_top_dict(lp_rows[s["pos"]])
             out.append(S.slot_distribution(top, s["label_ids"]))
         results.append(out)
-        usages.append({"prompt_tokens": len(prompt_ids) + mm_extra})
+        usages.append({"prompt_tokens": len(prompt_ids)})
     return results, usages
 
 orig_read_many = S.read_many
@@ -310,7 +252,7 @@ def inproc_upstream_completions(body, timeout=600):
 def inproc_upstream_chat(body, timeout=600):
     msgs = body.get("messages", [])
     thinking = (body.get("chat_template_kwargs") or {}).get("enable_thinking", False)
-    prompt_ids, mm_data = _extract_chat_messages_mm(msgs, thinking=thinking)
+    prompt_ids = S.chat_messages_ids(msgs, thinking=thinking)
     xargs = body.get("vllm_xargs")
     lids = body.get("logprob_token_ids")
     top_lp = len(lids) if lids else int(body.get("top_logprobs") or (S.TOPK if body.get("logprobs") else 1))
@@ -322,9 +264,8 @@ def inproc_upstream_chat(body, timeout=600):
         stop_token_ids=body.get("stop_token_ids"),
         extra_args=xargs,
     )
-    prompt_item = {"prompt_token_ids": prompt_ids, "multi_modal_data": mm_data} if mm_data is not None else {"prompt_token_ids": prompt_ids}
     with ENGINE_LOCK:
-        ro = LLM_ENGINE.generate([prompt_item], [sp], use_tqdm=False)[0]
+        ro = LLM_ENGINE.generate([{"prompt_token_ids": prompt_ids}], [sp], use_tqdm=False)[0]
     out = ro.outputs[0]
     content = []
     for pos_idx, tid in enumerate(out.token_ids):
@@ -344,7 +285,7 @@ def inproc_upstream_chat(body, timeout=600):
             "logprobs": {"content": content},
             "finish_reason": "stop",
         }],
-        "usage": {"prompt_tokens": len(prompt_ids) + (280 if mm_data is not None else 0)},
+        "usage": {"prompt_tokens": len(prompt_ids)},
     }
 
 S.upstream_completions = inproc_upstream_completions
@@ -356,7 +297,7 @@ gpu_cap = torch.cuda.get_device_capability(0) if torch.cuda.is_available() else 
 low_vram = gpu_vram_gib < 20.0
 dtype = os.environ.get("DTYPE", "float16" if gpu_cap[0] < 8 else "auto")
 cpu_offload_gb = float(os.environ.get("CPU_OFFLOAD_GB", "5.0" if low_vram else "0.0"))
-disable_mm = os.environ.get("DISABLE_MM", "1" if low_vram else "0") == "1"
+disable_mm = os.environ.get("DISABLE_MM", "1") == "1"
 kv_cache_gb = float(os.environ.get("KV_CACHE_GB", "0.5" if low_vram else "2.0"))
 print(
     f"[ultra-fast-init] Initializing in-process vLLM LLM engine "
@@ -394,7 +335,7 @@ LLM_ENGINE = LLM(
 )
 tok_thread.join()
 ENGINE_READY = True
-print(f"[ultra-fast-init] ENGINE_READY=True (in-process vLLM ready, vision={not disable_mm}) at t={time.time() - T_BOOT:.2f}s", flush=True)
+print(f"[ultra-fast-init] ENGINE_READY=True (in-process vLLM ready) at t={time.time() - T_BOOT:.2f}s", flush=True)
 
 while True:
     time.sleep(3600)

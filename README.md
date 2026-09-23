@@ -13,7 +13,6 @@ Built-in demo apps:
 - `/snake`: [mizorewww/laya-coreml](https://github.com/mizorewww/laya-coreml)
 - `/dino`: [virajbhartiya/laya-vs-jev](https://github.com/virajbhartiya/laya-vs-jev)
 - `/tetris`: [trungdq88/jev-tetris](https://github.com/trungdq88/jev-tetris)
-- `/vision`: 1-step `6x6` spatial semantic segmentation (`36` cells in `~73 ms`) and `16`-sensor System-1 visual radar (`gemma4_vision` `280` soft tokens)
 
 <img width="640" height="360" alt="djev snake" src="https://github.com/user-attachments/assets/2e9a5321-f8a9-4734-b6f2-4d6f47193390" />
 
@@ -71,18 +70,17 @@ gcloud beta run deploy djev-dgemma \
 # COPY_TO_SHM=1: stages the 17.5 GB model into /dev/shm RAM in the background while Python imports torch/vllm
 # VLLM_WORKER_MULTIPROC_METHOD=fork: forks EngineCore from APIServer without re-importing Python
 # ENFORCE_EAGER=1 & TORCH_COMPILE_DISABLE=1: skips torch.compile, CUDA graph capture, and redundant startup profiling
-# DISABLE_MM=1: skips SigLIP vision/video encoder profiling for text-only evaluation
+# DISABLE_MM=1: skips multimodal encoder initialization for text-only evaluation
 ```
 
 ### Step 3: Open the Built-in Demos
 
-All four demos are standalone HTML files with zero external dependencies that
+All three demos are standalone HTML files with zero external dependencies that
 call `POST /v1/systemone` directly from the browser via `fetch()`:
 
 - Snake: `https://<your-cloud-run-url>/snake`
 - Chrome Dino: `https://<your-cloud-run-url>/dino`
 - Tetris: `https://<your-cloud-run-url>/tetris`
-- Vision (1-Step `6x6` Segmentation & Radar): `https://<your-cloud-run-url>/vision`
 
 --------------------------------------------------------------------------------
 
@@ -174,7 +172,7 @@ To reach a 47.5-second cold start on Cloud Run, the container streams the 17.5 G
 `safetensors` weights from GCS into `/dev/shm` RAM in the background (`1.05
 GiB/s`) while Python imports `torch` and `vllm`, forks `EngineCore` from
 `APIServer` (`VLLM_WORKER_MULTIPROC_METHOD=fork`) so modules are not imported
-twice, disables unused SigLIP vision profiling (`DISABLE_MM=1`), and skips
+twice, disables unused multimodal profiling (`DISABLE_MM=1`), and skips
 `torch.compile`, CUDA graph capture, and redundant memory-profiling passes
 (`ENFORCE_EAGER=1`, `TORCH_COMPILE_DISABLE=1`, `--kv-cache-memory`).
 
