@@ -1,6 +1,9 @@
 # djev-run
 
-Serve DiffusionGemma-Jev (`djev`) on a TypeSafe AI compatible API on Cloud Run
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/taeold/djev-run/blob/main/colab.ipynb)
+
+
+Serve DiffusionGemma-Jev (`djev`) on Cloud Run
 with an NVIDIA RTX PRO 6000 Blackwell GPU, built on
 [mmastrac/djev](https://github.com/mmastrac/djev).
 
@@ -32,117 +35,96 @@ gcloud storage cp -r /tmp/dgemma/* "gs://${BUCKET}/dgemma/"
 
 ### Step 2: Deploy to Cloud Run
 
+You have two options for deployment:
+
+#### Option A: Pre-built `djev-run` Container (Recommended)
+Deploy the pre-built image with `/dev/shm` staging and all `vllm serve` flags baked in.
 ```bash
 gcloud beta run deploy djev-dgemma \
-  --region="${REGION}" \
+  --region="us-central1" \
   --image=ghcr.io/taeold/djev-run:latest \
-  --gpu=1 \
-  --gpu-type=nvidia-rtx-pro-6000 \
-  --no-gpu-zonal-redundancy \
-  --cpu=20 \
-  --memory=80Gi \
-  --no-cpu-throttling \
-  --concurrency=32 \
-  --min-instances=0 \
-  --max-instances=1 \
+  --gpu=1 --gpu-type=nvidia-rtx-pro-6000 --no-gpu-zonal-redundancy \
+  --cpu=20 --memory=80Gi --no-cpu-throttling \
+  --concurrency=32 --min-instances=0 --max-instances=1 \
   --port=8080 \
-  --network=default \
-  --subnet=default \
-  --vpc-egress=all-traffic \
+  --network=default --subnet=default --vpc-egress=all-traffic \
   --add-volume=name=weights,type=cloud-storage,bucket="${BUCKET}",readonly=false,mount-options=enable-buffered-read=true \
   --add-volume-mount=volume=weights,mount-path=/mnt/gcs \
-  --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=5,periodSeconds=2,timeoutSeconds=2,failureThreshold=120 \
-  --set-env-vars="MODEL=/mnt/gcs/dgemma,CANVAS=128,MAX_SEQS=32,MAX_MODEL_LEN=4096,GPU_UTIL=0.40,KV_CACHE_GB=2,ATTN=TRITON_ATTN,TEST_PAGE=1,COPY_TO_SHM=1,ENFORCE_EAGER=1,DISABLE_MM=1,TORCH_COMPILE_DISABLE=1,VLLM_WORKER_MULTIPROC_METHOD=fork,VLLM_UF_EAGER_ALL=1,VLLM_FLASHINFER_MOE_BACKEND=masked_gemm,CUDA_MODULE_LOADING=LAZY"
+  --startup-probe=httpGet.path=/health,httpGet.port=8080,initialDelaySeconds=5,periodSeconds=2,timeoutSeconds=2,failureThreshold=120
+```
 
-# --image=ghcr.io/taeold/djev-run:latest: prebuilt from github.com/mmastrac/djev (upstream does not publish a registry image)
+#### Option B: Raw `vLLM` Nightly Container (Zero custom Dockerfile)
+Directly deploy the upstream Docker container running pure OpenAI completions.
+```bash
+gcloud beta run deploy djev-dgemma \
+  --region="us-central1" \
+  --image=docker.io/vllm/vllm-openai:nightly \
+  --gpu=1 --gpu-type=nvidia-rtx-pro-6000 --no-gpu-zonal-redundancy \
+  --cpu=20 --memory=80Gi --no-cpu-throttling \
+  --concurrency=32 --min-instances=0 --max-instances=1 \
+  --port=8000 \
+  --network=default --subnet=default --vpc-egress=all-traffic \
+  --add-volume=name=weights,type=cloud-storage,bucket="${BUCKET}",readonly=false,mount-options=enable-buffered-read=true \
+  --add-volume-mount=volume=weights,mount-path=/mnt/gcs \
+  --startup-probe=httpGet.path=/health,httpGet.port=8000,initialDelaySeconds=5,periodSeconds=2,timeoutSeconds=2,failureThreshold=120 \
+  --set-env-vars="VLLM_FLASHINFER_MOE_BACKEND=masked_gemm,VLLM_ENABLE_V1_MULTIPROCESSING=0" \
+  --command="/bin/bash" \
+  --args="-c","cp -r /mnt/gcs/dgemma /dev/shm/dgemma && exec vllm serve /dev/shm/dgemma --served-model-name djev-dgemma --allowed-origins '[\"*\"]' --trust-remote-code --enforce-eager --language-model-only --attention-backend TRITON_ATTN --kv-cache-memory 2G --max-num-seqs 32 --max-model-len 4096 --diffusion-config '{\"canvas_length\":128}' --override-generation-config '{\"max_new_tokens\":null}'"
+
+# Cloud Run & Storage flags:
+# --image=docker.io/vllm/vllm-openai:nightly: serves standard vLLM diffusion natively without a custom Dockerfile
 # --no-gpu-zonal-redundancy: required for standard regional RTX PRO 6000 quota
 # --no-cpu-throttling: keeps all 20 vCPUs active during weight loading and vLLM scheduling
 # --network=default --subnet=default --vpc-egress=all-traffic: streams weights from GCS over Google internal networking (~1.05 GiB/s)
-# mount-options=enable-buffered-read=true: prefetches 18 GB safetensors shards sequentially from GCS
-# TEST_PAGE=1: enables the built-in /snake, /dino, /tetris, and /playground web UIs
-# COPY_TO_SHM=1: stages the 17.5 GB model into /dev/shm RAM in the background while Python imports torch/vllm
-# VLLM_WORKER_MULTIPROC_METHOD=fork: forks EngineCore from APIServer without re-importing Python
-# ENFORCE_EAGER=1 & TORCH_COMPILE_DISABLE=1: skips torch.compile, CUDA graph capture, and redundant startup profiling
-# DISABLE_MM=1: skips SigLIP vision/video encoder profiling for text-only evaluation
+# mount-options=enable-buffered-read=true & cp -r to /dev/shm: prefetches 18 GB safetensors shards sequentially from GCS into RAM before vLLM starts
+#
+# vLLM cold-start & runtime flags (--set-env-vars / --args):
+# VLLM_ENABLE_V1_MULTIPROCESSING=0: runs EngineCore in-process so Python/CUDA modules are not imported twice
+# VLLM_FLASHINFER_MOE_BACKEND=masked_gemm: selects the low-latency FlashInfer MoE kernel on Blackwell SM120
+# --enforce-eager: skips torch.compile and CUDA graph capture on startup
+# --language-model-only: skips loading and profiling the unused SigLIP vision encoder
+# --kv-cache-memory=2G: pre-allocates a fixed 2 GiB KV cache, skipping the startup memory-profiling forward pass
+# --attention-backend=TRITON_ATTN: uses Triton bidirectional attention required by DiffusionGemma
+# --diffusion-config='{"canvas_length":128}': configures the 128-token parallel diffusion canvas
 ```
 
-### Step 3: Open the Built-in Demos
+### Step 3: Query with Standard vLLM Diffusion
 
-All three demos are standalone HTML files with zero external dependencies that
-call `POST /v1/systemone` directly from the browser via `fetch()`:
-
-- Snake: `https://<your-cloud-run-url>/snake`
-- Chrome Dino: `https://<your-cloud-run-url>/dino`
-- Tetris: `https://<your-cloud-run-url>/tetris`
-
---------------------------------------------------------------------------------
-
-## Use with Vercel AI SDK (Optional)
-
-Because `djev-run` implements the `/v1/systemone` endpoint contract, you can
-also point `@ai-sdk/typesafe-ai` at your Cloud Run URL from Node.js or
-TypeScript (`index.ts`):
-
-```typescript
-import { createTypeSafeAi } from '@ai-sdk/typesafe-ai';
-import { experimental_evaluate, type Experimental_EvaluationModel } from 'ai';
-
-const typeSafeAi = createTypeSafeAi({
-  baseURL: 'https://<your-cloud-run-url>/v1',
-});
-
-async function triage(model: Experimental_EvaluationModel, message: string) {
-  return experimental_evaluate({
-    model,
-    state: { message },
-    questions: {
-      department: {
-        type: 'choice',
-        instructions: 'Which team should handle this?',
-        criteria: {
-          billing: 'Payments and refunds',
-          support: 'Other requests',
-        },
-      },
-      severity: {
-        type: 'score',
-        instructions: 'How severe is the issue?',
-        criteria: ['Cosmetic', 'Workaround exists', 'Blocking; no workaround'],
-      },
-      requestsRefund: {
-        type: 'boolean',
-        instructions: 'Is the customer requesting money back?',
-      },
-    },
-  });
-}
-
-const result = await triage(
-  typeSafeAi.evaluationModel('jev-latest'),
-  'I was charged twice and my account is locked',
-);
-console.log(result);
-// {
-//   department: {
-//     type: 'choice',
-//     choice: 'billing',
-//     probabilities: { billing: 0.9988, support: 0.0012 }
-//   },
-//   severity: {
-//     type: 'score',
-//     score: 1.9995,
-//     probabilities: { '0': 0.0002, '1': 0.0001, '2': 0.9997 }
-//   },
-//   requestsRefund: {
-//     type: 'boolean',
-//     probability: 0.9928
-//   }
-// }
-```
+A clean `curl` / JS example calling standard vLLM `POST /tokenize` + `POST /v1/chat/completions` explicitly passing `vllm_xargs`:
 
 ```bash
-npm install
-CLOUD_RUN_URL="https://<your-cloud-run-url>" TYPESAFE_AI_API_KEY="$(gcloud auth print-identity-token)" npm start
+# 1. Tokenize query
+curl -s https://<your-cloud-run-url>/tokenize \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Classify: Payment issues\nlabel:"}'
+```
+
+```json
+{"count":8,"max_model_len":4096,"tokens":[4335,1891,236787,35032,4342,107,2491,236787],"token_strs":null}
+```
+
+# 2. Diffusion Read
+
+```bash
+curl -s https://<your-cloud-run-url>/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "djev-dgemma",
+    "messages": [
+      {"role": "user", "content": "Classify: Payment issues\nlabel:"}
+    ],
+    "max_tokens": 8,
+    "vllm_xargs": {
+      "diffusion_seed_canvas": [4335, 1891, 236787, 35032, 4342, 107, 2491, 236787, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 
+      "diffusion_pinned": [0, 1, 2],
+      "diffusion_max_steps": 1,
+      "diffusion_read_only": true
+    }
+  }'
+```
+
+```json
+{"id":"chatcmpl-8929997c074788e6","object":"chat.completion","created":1790206319,"model":"djev-dgemma","choices":[{"index":0,"message":{"role":"assistant","content":"thought\nTo provide this most,,, need","refusal":null},"logprobs":null,"finish_reason":"length"}],"usage":{"prompt_tokens":17,"total_tokens":33,"completion_tokens":16}}
 ```
 
 --------------------------------------------------------------------------------
@@ -161,21 +143,3 @@ CLOUD_RUN_URL="https://<your-cloud-run-url>" TYPESAFE_AI_API_KEY="$(gcloud auth 
 | `djev-run (steps=1, samples="auto")` | 81.8% | 73.5 | 121 ms |
 | `api.djev.dev` | 81.8% | 73.0 | 237 ms |
 
-To reach a 47.5-second cold start on Cloud Run, the container streams the 17.5 GB
-`safetensors` weights from GCS into `/dev/shm` RAM in the background (`1.05
-GiB/s`) while Python imports `torch` and `vllm`, forks `EngineCore` from
-`APIServer` (`VLLM_WORKER_MULTIPROC_METHOD=fork`) so modules are not imported
-twice, disables unused SigLIP vision profiling (`DISABLE_MM=1`), and skips
-`torch.compile`, CUDA graph capture, and redundant memory-profiling passes
-(`ENFORCE_EAGER=1`, `TORCH_COMPILE_DISABLE=1`, `--kv-cache-memory`).
-
-Empirical benchmarks on Cloud Run with the RTX PRO 6000 confirmed:
-- Streaming over VPC egress from GCS FUSE into `/dev/shm` (~47.5s) outperforms baking weights into the container image (80-115s), avoiding heavy overlay filesystem read overhead and long image import operations.
-- `--cpu-boost` is omitted because host CPU frequency scaling under boosted allocation slows down 20 vCPU container initialization on GPU nodes (73-75s vs 47.5s).
-
---------------------------------------------------------------------------------
-
-## Pricing
-
-1 NVIDIA RTX PRO 6000 GPU (20 vCPU, 80 GiB RAM) costs $3.19 per hour while
-active and scales to $0 when idle with `--min-instances=0`.

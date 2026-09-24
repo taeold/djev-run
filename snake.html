@@ -493,6 +493,7 @@ async function callDiffusionChatCompletions(payload, baseUrl = "") {
     _tokCache.set(cacheKey, tpl);
   }
   const seedCanvas = tpl.baseToks.slice();
+  while (seedCanvas.length < 128) seedCanvas.push(1);
   for (const pos of tpl.slotPositions) seedCanvas[pos] = Math.floor(Math.random() * 262144);
   const chatBody = {
     model: payload.model || "djev-dgemma",
@@ -500,16 +501,14 @@ async function callDiffusionChatCompletions(payload, baseUrl = "") {
       { role: "system", content: sysText },
       { role: "user", content: typeof payload.state === "string" ? payload.state : JSON.stringify(payload.state) }
     ],
-    max_tokens: tpl.baseToks.length + 1,
+    max_tokens: tpl.baseToks.length,
     logprobs: true,
     top_logprobs: 20,
-    extra_body: {
-      vllm_xargs: {
-        diffusion_seed_canvas: seedCanvas,
-        diffusion_pinned: tpl.pinned,
-        diffusion_max_steps: payload.steps || 1,
-        diffusion_read_only: true
-      }
+    vllm_xargs: {
+      diffusion_seed_canvas: seedCanvas,
+      diffusion_pinned: tpl.pinned,
+      diffusion_max_steps: payload.steps || 1,
+      diffusion_read_only: true
     }
   };
   const res = await fetch(`${baseUrl}/v1/chat/completions`, {

@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/docker.yml'
+      - 'Dockerfile'
       - 'snake.html'
       - 'dino.html'
       - 'tetris.html'
@@ -22,17 +23,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Stage container build context
-        run: |
-          cat > Dockerfile.cloudrun << 'EOF'
-          FROM ghcr.io/taeold/djev-run:latest
-          COPY snake.html dino.html tetris.html /opt/dgemma/
-          COPY entrypoint.sh /entrypoint.sh
-          RUN chmod +x /entrypoint.sh
-          EXPOSE 8080
-          ENTRYPOINT ["/entrypoint.sh"]
-          EOF
-
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -44,7 +34,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ./Dockerfile.cloudrun
+          file: ./Dockerfile
           platforms: linux/amd64
           push: true
           tags: ghcr.io/taeold/djev-run:latest

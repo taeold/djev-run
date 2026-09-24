@@ -1306,6 +1306,7 @@ Action analysis:
             window._dinoTokCache.set(baseStr, tpl);
           }
           const seedCanvas = tpl.baseToks.slice();
+  while (seedCanvas.length < 128) seedCanvas.push(1);
           for (const pos of tpl.slotPositions) seedCanvas[pos] = Math.floor(Math.random() * 262144);
           const chatBody = {
             model: reqPayload.model || "djev-dgemma",
@@ -1313,17 +1314,15 @@ Action analysis:
               { role: "system", content: sysText },
               { role: "user", content: typeof reqPayload.state === "string" ? reqPayload.state : JSON.stringify(reqPayload.state) }
             ],
-            max_tokens: tpl.baseToks.length + 1,
+            max_tokens: tpl.baseToks.length,
             logprobs: true,
             top_logprobs: 20,
-            extra_body: {
-              vllm_xargs: {
+            vllm_xargs: {
                 diffusion_seed_canvas: seedCanvas,
                 diffusion_pinned: tpl.pinned,
                 diffusion_max_steps: reqPayload.steps || 1,
                 diffusion_read_only: true
               }
-            }
           };
           const endpoint = (document.getElementById("endpointInput").value.trim() || "/v1/chat/completions").replace("/v1/systemone", "/v1/chat/completions");
           const resp = await fetch(endpoint, {

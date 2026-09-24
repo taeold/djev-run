@@ -1134,6 +1134,7 @@ async function askJev(request, placements, gameInfo, signal) {
         _tetrisTokCache.set(cacheKey, tpl);
       }
       const seedCanvas = tpl.baseToks.slice();
+  while (seedCanvas.length < 128) seedCanvas.push(1);
       for (const pos of tpl.slotPositions) seedCanvas[pos] = Math.floor(Math.random() * 262144);
       const chatBody = {
         model: request.model || "djev-dgemma",
@@ -1141,17 +1142,15 @@ async function askJev(request, placements, gameInfo, signal) {
           { role: "system", content: sysText },
           { role: "user", content: typeof request.state === "string" ? request.state : JSON.stringify(request.state) }
         ],
-        max_tokens: tpl.baseToks.length + 1,
+        max_tokens: tpl.baseToks.length,
         logprobs: true,
         top_logprobs: 20,
-        extra_body: {
-          vllm_xargs: {
+        vllm_xargs: {
             diffusion_seed_canvas: seedCanvas,
             diffusion_pinned: tpl.pinned,
             diffusion_max_steps: request.steps || 1,
             diffusion_read_only: true
           }
-        }
       };
       const res = await fetch(`${baseUrl}/v1/chat/completions`, {
         method: "POST",
