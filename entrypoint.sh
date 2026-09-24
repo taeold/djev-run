@@ -22,7 +22,7 @@ exec vllm serve /dev/shm/dgemma \
   --middleware server.SystemOneMiddleware \
   --port "${PORT:-8080}" \
   --served-model-name djev-dgemma \
-  --allowed-origins '["*"]' \
+  --allowed-origins * \
   --trust-remote-code \
   --enforce-eager \
   --language-model-only \
