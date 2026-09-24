@@ -88,53 +88,7 @@ gcloud beta run deploy djev-dgemma \
 # --diffusion-config='{"canvas_length":128}': configures the 128-token parallel diffusion canvas
 ```
 
-### Step 3: Querying the Model
-
-You have two options depending on which deployment you chose in Step 2:
-
-#### Option A: Query with `/v1/systemone` (`ghcr.io/taeold/djev-run:latest`)
-The pre-built container includes an ASGI middleware that natively parses the high-level `state` + `questions` JSON schema, calculates token slots dynamically, builds the 128-token canvas, invokes the internal vLLM generation endpoint, and normalizes the logprobs into concrete category and score outputs.
-
-```bash
-curl -s https://<your-cloud-run-url>/v1/systemone \
-  -H "Content-Type: application/json" \
-  -d '{
-    "state": "Classify: Payment issues\nlabel:",
-    "steps": 1,
-    "questions": [
-      {
-        "id": "category",
-        "type": "choice",
-        "choices": [["Billing", "Billing"], ["Technical", "Technical"], ["Other", "Other"]],
-        "labels": ["Billing", "Technical", "Other"]
-      }
-    ]
-  }'
-```
-
-```json
-{
-  "answers": {
-    "category": {
-      "choice": "Billing",
-      "probabilities": {
-        "Billing": 0.85,
-        "Technical": 0.10,
-        "Other": 0.05
-      },
-      "confidence": 0.85
-    }
-  },
-  "diagnostics": {
-    "timing": {
-      "total_ms": 116.3
-    }
-  }
-}
-```
-
-#### Option B: Query with Standard vLLM Diffusion (`POST /tokenize` + `POST /v1/chat/completions`)
-When using the raw `vllm-openai:nightly` container directly, you must manually pre-tokenize the prompt before invoking the completions schema explicitly passing the parallel `diffusion_seed_canvas` natively routing through `vllm_xargs`.
+### Step 3: Query the Model
 
 ```bash
 # 1. Tokenize query
@@ -158,7 +112,7 @@ curl -s https://<your-cloud-run-url>/v1/chat/completions \
     ],
     "max_tokens": 8,
     "vllm_xargs": {
-      "diffusion_seed_canvas": [4335, 1891, 236787, 35032, 4342, 107, 2491, 236787, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 
+      "diffusion_seed_canvas": [1, 2, 3, 4],
       "diffusion_pinned": [0, 1, 2],
       "diffusion_max_steps": 1,
       "diffusion_read_only": true
@@ -167,11 +121,67 @@ curl -s https://<your-cloud-run-url>/v1/chat/completions \
 ```
 
 ```json
+{"id":"chatcmpl-8929997c074788e6","object":"chat.completion","created":1790206319,"model":"djev-dgemma","choices":[{"index":0,"message":{"role":"assistant","content":" Billing"},"finish_reason":"length"}]}
+```
+
+`ghcr.io/taeold/djev-run:latest` also includes support for the `/v1/systemone` endpoint:
+
+```bash
+curl -s https://<your-cloud-run-url>/v1/systemone \
+  -H "Content-Type: application/json" \
+  -d '{
+    "state": "Customer cannot complete checkout; card declined twice.",
+    "questions": {
+      "category": {
+        "type": "choice",
+        "instructions": "Classify the support ticket",
+        "criteria": ["billing", "technical", "account"]
+      }
+    }
+  }'
+```
+
+```json
 {
-  "id": "chatcmpl",
-  "object": "chat.completion",
-  "created": 1727834,
   "model": "djev-dgemma",
-  "choices": [{"index": 0, "message": {"role": "assistant", "content": " Billing"}, "finish_reason": "length"}]
+  "answers": {
+    "category": {
+      "choice": "billing",
+      "probabilities": {
+        "billing": 0.942,
+        "technical": 0.041,
+        "account": 0.017
+      },
+      "confidence": 0.942
+    }
+  },
+  "diagnostics": {
+    "timing": {
+      "total_ms": 116.3
+    }
+  }
 }
 ```
+
+--------------------------------------------------------------------------------
+
+## Performance
+
+- Cold start from zero instances: ~47.5s (down from 4m 05s baseline)
+- Median response time: 61 ms on server, 117 ms end-to-end (`steps=1, samples=1`; 121 ms end-to-end with `samples="auto"`)
+- Batch throughput: ~100-123 requests/sec at `concurrency=32`
+
+[JevBench](https://benchmarkheaven.com/jev-models) v1.3.0 (`N = 231` public suite):
+
+| Configuration | Overall Accuracy | Composite Score | Median Response Time |
+| --- | --- | --- | --- |
+| `djev-run (steps=1, samples=1)` | 81.4% | 73.4 | 117 ms |
+| `djev-run (steps=1, samples="auto")` | 81.8% | 73.5 | 121 ms |
+| `api.djev.dev` | 81.8% | 73.0 | 237 ms |
+
+--------------------------------------------------------------------------------
+
+## Pricing
+
+1 NVIDIA RTX PRO 6000 GPU (20 vCPU, 80 GiB RAM) costs $3.19 per hour while
+active and scales to $0 when idle with `--min-instances=0`.
