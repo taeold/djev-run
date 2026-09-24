@@ -3,6 +3,7 @@ set -euo pipefail
 
 export VLLM_ENABLE_V1_MULTIPROCESSING=0
 export VLLM_FLASHINFER_MOE_BACKEND=masked_gemm
+export LD_LIBRARY_PATH="/usr/local/cuda/compat:${LD_LIBRARY_PATH:-}"
 export PYTHONPATH="/opt/dgemma:${PYTHONPATH:-}"
 
 cp -r "${MODEL:-/mnt/gcs/dgemma}" /dev/shm/dgemma
