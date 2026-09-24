@@ -11,6 +11,7 @@ on:
       - 'dino.html'
       - 'tetris.html'
       - 'entrypoint.sh'
+      - 'server.py'
 
 permissions:
   contents: read
